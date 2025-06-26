@@ -22,9 +22,35 @@
 
   p {
     font-size: 1.2rem;
-    margin: 0;
+    margin: 0 0 20px 0;
     opacity: 0.9;
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  }
+}
+
+.status-banner {
+  background: rgba(255, 193, 7, 0.9);
+  border-radius: 12px;
+  padding: 12px 20px;
+  margin: 0 auto 20px auto;
+  max-width: 600px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+
+  .banner-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .banner-icon {
+    font-size: 1.2rem;
+  }
+
+  .banner-text {
+    color: #333;
+    font-weight: 600;
+    font-size: 0.95rem;
   }
 }
 
@@ -136,6 +162,16 @@
 
     p {
       font-size: 1rem;
+    }
+  }
+
+  .status-banner {
+    margin-left: 10px;
+    margin-right: 10px;
+    padding: 10px 16px;
+
+    .banner-text {
+      font-size: 0.9rem;
     }
   }
 

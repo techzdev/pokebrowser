@@ -1,8 +1,9 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, BehaviorSubject, forkJoin, of } from 'rxjs';
-import { map, switchMap, catchError } from 'rxjs/operators';
+import { Observable, BehaviorSubject, forkJoin, of, timer } from 'rxjs';
+import { map, switchMap, catchError, delay } from 'rxjs/operators';
 import { Pokemon, PokemonListResponse, PokemonDetails } from '../models/pokemon.model';
+import { generateMockPokemon } from '../models/mock-data';
 
 @Injectable({
   providedIn: 'root'
@@ -11,17 +12,26 @@ export class PokemonService {
   private readonly API_URL = 'https://pokeapi.co/api/v2';
   private pokemonSubject = new BehaviorSubject<Pokemon[]>([]);
   private loadingSubject = new BehaviorSubject<boolean>(false);
-  private totalCount = 0;
+  private errorSubject = new BehaviorSubject<string | null>(null);
+  private totalCount = 1008; // Total Pokemon count
   private currentOffset = 0;
   private readonly limit = 20;
+  private useMockData = false;
 
   pokemon$ = this.pokemonSubject.asObservable();
   loading$ = this.loadingSubject.asObservable();
+  error$ = this.errorSubject.asObservable();
 
   constructor(private http: HttpClient) {}
 
   loadPokemon(offset: number = 0): Observable<Pokemon[]> {
     this.loadingSubject.next(true);
+    this.errorSubject.next(null);
+    
+    // If we're already using mock data or if this is a retry, use mock data
+    if (this.useMockData) {
+      return this.loadMockPokemon(offset);
+    }
     
     return this.http.get<PokemonListResponse>(`${this.API_URL}/pokemon?limit=${this.limit}&offset=${offset}`)
       .pipe(
@@ -62,11 +72,27 @@ export class PokemonService {
           return updatedPokemon;
         }),
         catchError(error => {
-          console.error('Error loading Pokemon:', error);
-          this.loadingSubject.next(false);
-          return of([]);
+          console.warn('API request failed, switching to mock data:', error);
+          this.useMockData = true;
+          this.errorSubject.next('Using demo data - API unavailable');
+          return this.loadMockPokemon(offset);
         })
       );
+  }
+
+  private loadMockPokemon(offset: number): Observable<Pokemon[]> {
+    // Simulate API delay
+    return timer(500).pipe(
+      map(() => {
+        const mockPokemon = generateMockPokemon(offset, this.limit);
+        const currentPokemon = this.pokemonSubject.value;
+        const updatedPokemon = offset === 0 ? mockPokemon : [...currentPokemon, ...mockPokemon];
+        this.pokemonSubject.next(updatedPokemon);
+        this.currentOffset = offset + this.limit;
+        this.loadingSubject.next(false);
+        return updatedPokemon;
+      })
+    );
   }
 
   loadMorePokemon(): Observable<Pokemon[]> {
@@ -93,5 +119,10 @@ export class PokemonService {
   reset(): void {
     this.pokemonSubject.next([]);
     this.currentOffset = 0;
+    this.errorSubject.next(null);
+  }
+
+  isUsingMockData(): boolean {
+    return this.useMockData;
   }
 }

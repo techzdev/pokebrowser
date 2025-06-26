@@ -2,6 +2,13 @@
   <header class="grid-header">
     <h1>Pokémon Browser</h1>
     <p>Discover and explore the world of Pokémon</p>
+    
+    <div class="status-banner" *ngIf="error">
+      <div class="banner-content">
+        <span class="banner-icon">⚠️</span>
+        <span class="banner-text">{{ error }}</span>
+      </div>
+    </div>
   </header>
 
   <div class="pokemon-grid" 
@@ -25,6 +32,6 @@
   <div class="empty-state" *ngIf="!loading && pokemon.length === 0">
     <div class="empty-icon">🔍</div>
     <h3>No Pokémon found</h3>
-    <p>Unable to load Pokémon data. Please try again later.</p>
+    <p>Unable to load Pokémon data. Please check your connection and try again.</p>
   </div>
 </div>

@@ -15,6 +15,7 @@ import { Pokemon } from '../../models/pokemon.model';
 export class PokemonGrid implements OnInit, OnDestroy {
   pokemon: Pokemon[] = [];
   loading = false;
+  error: string | null = null;
   private destroy$ = new Subject<void>();
   private isLoadingMore = false;
 
@@ -31,6 +32,12 @@ export class PokemonGrid implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe(loading => {
         this.loading = loading;
+      });
+
+    this.pokemonService.error$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(error => {
+        this.error = error;
       });
 
     // Load initial Pokemon
@@ -68,5 +75,9 @@ export class PokemonGrid implements OnInit, OnDestroy {
 
   trackByPokemon(index: number, pokemon: Pokemon): number {
     return pokemon.id;
+  }
+
+  get isUsingMockData(): boolean {
+    return this.pokemonService.isUsingMockData();
   }
 }
