@@ -1,0 +1,30 @@
+<div class="pokemon-grid-container">
+  <header class="grid-header">
+    <h1>Pokémon Browser</h1>
+    <p>Discover and explore the world of Pokémon</p>
+  </header>
+
+  <div class="pokemon-grid" 
+       *ngIf="pokemon.length > 0">
+    <app-pokemon-card 
+      *ngFor="let poke of pokemon; trackBy: trackByPokemon; let i = index"
+      [pokemon]="poke"
+      [index]="i">
+    </app-pokemon-card>
+  </div>
+
+  <div class="loading-spinner" *ngIf="loading">
+    <div class="spinner">
+      <div class="pokeball">
+        <div class="pokeball-button"></div>
+      </div>
+    </div>
+    <p>Loading Pokémon...</p>
+  </div>
+
+  <div class="empty-state" *ngIf="!loading && pokemon.length === 0">
+    <div class="empty-icon">🔍</div>
+    <h3>No Pokémon found</h3>
+    <p>Unable to load Pokémon data. Please try again later.</p>
+  </div>
+</div>

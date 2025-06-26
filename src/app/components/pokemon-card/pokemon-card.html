@@ -1,0 +1,22 @@
+<div class="pokemon-card" 
+     [style.animation-delay.ms]="index * 100">
+  <div class="card-inner">
+    <div class="pokemon-image">
+      <img [src]="pokemon.imageUrl" 
+           [alt]="pokemon.name"
+           (error)="onImageError($event)"
+           loading="lazy">
+    </div>
+    <div class="pokemon-info">
+      <div class="pokemon-id">#{{ pokemon.id.toString().padStart(3, '0') }}</div>
+      <h3 class="pokemon-name">{{ pokemon.name | titlecase }}</h3>
+      <div class="pokemon-types" *ngIf="pokemon.types">
+        <span *ngFor="let typeInfo of pokemon.types" 
+              class="type-badge"
+              [style.background-color]="getTypeColor(typeInfo.type.name)">
+          {{ typeInfo.type.name | titlecase }}
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
