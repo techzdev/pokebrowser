@@ -15,7 +15,7 @@ export class PokemonService {
   private errorSubject = new BehaviorSubject<string | null>(null);
   private totalCount = 1008; // Total Pokemon count
   private currentOffset = 0;
-  private readonly limit = 20;
+  private readonly limit = 24; // เพิ่มจำนวนโหลดต่อครั้งจาก 20 เป็น 24
   private useMockData = false;
 
   pokemon$ = this.pokemonSubject.asObservable();
@@ -81,8 +81,8 @@ export class PokemonService {
   }
 
   private loadMockPokemon(offset: number): Observable<Pokemon[]> {
-    // Simulate API delay
-    return timer(500).pipe(
+    // ลด delay จาก 300ms เป็น 150ms เพื่อให้โหลดเร็วขึ้นมากกว่าเดิม
+    return timer(150).pipe(
       map(() => {
         const mockPokemon = generateMockPokemon(offset, this.limit);
         const currentPokemon = this.pokemonSubject.value;

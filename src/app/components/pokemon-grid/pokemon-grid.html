@@ -16,17 +16,44 @@
     <app-pokemon-card 
       *ngFor="let poke of pokemon; trackBy: trackByPokemon; let i = index"
       [pokemon]="poke"
-      [index]="i">
+      [index]="getDisplayIndex(i)"
+      [class.instant-show]="isRecentlyLoaded(i)">
     </app-pokemon-card>
+    
+    <!-- Skeleton Loading Cards สำหรับโหลดข้อมูลเพิ่มเติม -->
+    <div class="skeleton-card" 
+         *ngFor="let item of [1,2,3,4]; let i = index"
+         [style.animation-delay.ms]="i * 150"
+         [ngClass]="{'visible': showSkeletons}"
+         [ngStyle]="{'display': showSkeletons ? 'block' : 'none'}">
+      <div class="skeleton-image"></div>
+      <div class="skeleton-content">
+        <div class="skeleton-title"></div>
+        <div class="skeleton-text"></div>
+        <div class="skeleton-text short"></div>
+      </div>
+    </div>
   </div>
 
-  <div class="loading-spinner" *ngIf="loading">
+  <div class="loading-spinner" *ngIf="loading && pokemon.length === 0">
     <div class="spinner">
       <div class="pokeball">
         <div class="pokeball-button"></div>
       </div>
     </div>
     <p>Loading Pokémon...</p>
+  </div>
+
+  <!-- Loading indicator สำหรับโหลดข้อมูลเพิ่มเติม -->
+  <div class="load-more-indicator" *ngIf="isLoadingMore && pokemon.length > 0">
+    <div class="mini-spinner"></div>
+    <p>Loading more Pokémon...</p>
+  </div>
+
+  <!-- Invisible trigger element สำหรับ Intersection Observer -->
+  <div #loadTrigger 
+       class="load-trigger" 
+       *ngIf="pokemon.length > 0 && hasMorePokemon && !isLoadingMore">
   </div>
 
   <div class="empty-state" *ngIf="!loading && pokemon.length === 0">

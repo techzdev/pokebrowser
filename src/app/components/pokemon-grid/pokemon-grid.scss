@@ -1,40 +1,97 @@
 .pokemon-grid-container {
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #f1f5f9 100%);
   padding: 20px;
+  padding-bottom: 40px; // ลด padding ด้านล่าง
+  position: relative;
+  overflow: hidden;
+  
+  // Animated Pokeball Background Pattern
+  &::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background-image: 
+      radial-gradient(circle at 25% 25%, rgba(239, 68, 68, 0.03) 2px, transparent 2px),
+      radial-gradient(circle at 75% 25%, rgba(59, 130, 246, 0.03) 2px, transparent 2px),
+      radial-gradient(circle at 25% 75%, rgba(16, 185, 129, 0.03) 2px, transparent 2px),
+      radial-gradient(circle at 75% 75%, rgba(245, 158, 11, 0.03) 2px, transparent 2px);
+    background-size: 60px 60px, 80px 80px, 100px 100px, 120px 120px;
+    background-position: 0 0, 40px 40px, 20px 60px, 60px 20px;
+    animation: pokeball-drift 30s linear infinite; // เพิ่มเวลาจาก 20s เป็น 30s
+    z-index: 0;
+  }
+  
+  // Second layer of pokeball pattern (opposite direction)
+  &::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background-image: 
+      radial-gradient(circle at 50% 50%, rgba(139, 69, 19, 0.02) 1.5px, transparent 1.5px),
+      radial-gradient(circle at 30% 70%, rgba(168, 85, 247, 0.02) 1.5px, transparent 1.5px);
+    background-size: 90px 90px, 110px 110px;
+    background-position: 30px 30px, 70px 10px;
+    animation: pokeball-drift-reverse 35s linear infinite; // เพิ่มเวลาจาก 25s เป็น 35s
+    z-index: 0;
+  }
 }
 
 .grid-header {
   text-align: center;
   margin-bottom: 40px;
-  color: white;
+  color: #1f2937;
+  position: relative;
+  z-index: 2;
 
   h1 {
     font-size: 3rem;
     font-weight: 700;
     margin: 0 0 10px 0;
-    text-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-    background: linear-gradient(45deg, #FFD700, #FFA500);
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    background: linear-gradient(45deg, #ef4444, #f59e0b, #10b981, #3b82f6);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    background-size: 300% 300%;
+    animation: gradient-shift 4s ease-in-out infinite;
   }
 
   p {
     font-size: 1.2rem;
     margin: 0 0 20px 0;
-    opacity: 0.9;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    opacity: 0.7;
+    color: #4b5563;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  }
+}
+
+@keyframes gradient-shift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
   }
 }
 
 .status-banner {
-  background: rgba(255, 193, 7, 0.9);
+  background: rgba(255, 255, 255, 0.9);
   border-radius: 12px;
   padding: 12px 20px;
   margin: 0 auto 20px auto;
   max-width: 600px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  position: relative;
+  z-index: 2;
 
   .banner-content {
     display: flex;
@@ -48,7 +105,7 @@
   }
 
   .banner-text {
-    color: #333;
+    color: #1f2937;
     font-weight: 600;
     font-size: 0.95rem;
   }
@@ -61,6 +118,9 @@
   max-width: 1400px;
   margin: 0 auto;
   padding: 0 20px;
+  position: relative;
+  z-index: 2;
+  contain: layout style; // Enhanced containment for better performance and CLS prevention
 }
 
 .loading-spinner {
@@ -69,7 +129,9 @@
   align-items: center;
   justify-content: center;
   padding: 40px;
-  color: white;
+  color: #4b5563;
+  position: relative;
+  z-index: 2;
 
   .spinner {
     margin-bottom: 20px;
@@ -77,7 +139,7 @@
 
   p {
     font-size: 1.1rem;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
   }
 }
 
@@ -126,7 +188,9 @@
   justify-content: center;
   padding: 60px 20px;
   text-align: center;
-  color: white;
+  color: #4b5563;
+  position: relative;
+  z-index: 2;
 
   .empty-icon {
     font-size: 4rem;
@@ -137,14 +201,153 @@
   h3 {
     font-size: 1.5rem;
     margin: 0 0 10px 0;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    color: #1f2937;
   }
 
   p {
     font-size: 1rem;
     margin: 0;
     opacity: 0.8;
+    color: #6b7280;
   }
+}
+
+// Skeleton Loading Cards
+.skeleton-card {
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 16px;
+  padding: 16px;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all 0.4s ease;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  display: none; // ซ่อนเป็นค่าเริ่มต้น
+  min-height: 200px; // ให้ความสูงเท่ากับ pokemon card
+  backdrop-filter: blur(10px);
+  position: relative;
+  z-index: 2;
+  
+  &.visible {
+    opacity: 1;
+    transform: translateY(0);
+    display: block;
+  }
+
+  .skeleton-image {
+    width: 100%;
+    height: 120px; // เท่ากับ pokemon-image height
+    background: linear-gradient(90deg,
+      rgba(156, 163, 175, 0.3) 25%,
+      rgba(156, 163, 175, 0.5) 50%,
+      rgba(156, 163, 175, 0.3) 75%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.5s infinite;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    position: relative;
+    
+    // เพิ่ม pokeball placeholder
+    &::after {
+      content: '⚪';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 24px;
+      opacity: 0.3;
+      animation: pulse 2s infinite ease-in-out;
+    }
+  }
+
+  .skeleton-content {
+    .skeleton-title {
+      height: 20px;
+      background: linear-gradient(90deg,
+        rgba(156, 163, 175, 0.3) 25%,
+        rgba(156, 163, 175, 0.5) 50%,
+        rgba(156, 163, 175, 0.3) 75%);
+      background-size: 200% 100%;
+      animation: skeleton-loading 1.5s infinite;
+      border-radius: 4px;
+      margin-bottom: 8px;
+      width: 80%;
+    }
+
+    .skeleton-text {
+      height: 14px;
+      background: linear-gradient(90deg,
+        rgba(156, 163, 175, 0.3) 25%,
+        rgba(156, 163, 175, 0.5) 50%,
+        rgba(156, 163, 175, 0.3) 75%);
+      background-size: 200% 100%;
+      animation: skeleton-loading 1.5s infinite;
+      border-radius: 4px;
+      margin-bottom: 6px;
+
+      &.short {
+        width: 60%;
+      }
+    }
+  }
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.3;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: translate(-50%, -50%) scale(1.1);
+  }
+}
+
+// Mini Loading Indicator สำหรับ Load More
+.load-more-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px 20px;
+  text-align: center;
+  color: #4b5563;
+  position: relative;
+  z-index: 2;
+
+  .mini-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid rgba(75, 85, 99, 0.3);
+    border-top: 3px solid #3b82f6;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 12px;
+  }
+
+  p {
+    margin: 0;
+    font-size: 0.9rem;
+    opacity: 0.8;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  }
+}
+
+// Load Trigger (invisible element สำหรับ Intersection Observer)
+.load-trigger {
+  height: 1px;
+  width: 100%;
+  position: relative;
+  margin-top: 20px;
 }
 
 // Responsive design
@@ -180,6 +383,20 @@
     gap: 16px;
     padding: 0 10px;
   }
+
+  // Responsive design สำหรับ skeleton cards
+  .skeleton-card {
+    padding: 12px;
+    min-height: 180px;
+    
+    .skeleton-image {
+      height: 100px;
+      
+      &::after {
+        font-size: 20px;
+      }
+    }
+  }
 }
 
 @media (max-width: 480px) {
@@ -190,5 +407,29 @@
   .pokemon-grid {
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: 12px;
+  }
+}
+
+@keyframes pokeball-drift {
+  0% {
+    transform: translateX(0) translateY(0);
+  }
+  50% {
+    transform: translateX(-30px) translateY(-15px);
+  }
+  100% {
+    transform: translateX(-60px) translateY(0);
+  }
+}
+
+@keyframes pokeball-drift-reverse {
+  0% {
+    transform: translateX(0) translateY(0);
+  }
+  50% {
+    transform: translateX(25px) translateY(10px);
+  }
+  100% {
+    transform: translateX(50px) translateY(0);
   }
 }
