@@ -7,6 +7,8 @@ export interface Pokemon {
   types?: PokemonType[];
   height?: number;
   weight?: number;
+  base_experience?: number;
+  stats?: PokemonStat[];
 }
 
 export interface PokemonListResponse {
@@ -36,6 +38,15 @@ export interface PokemonType {
   };
 }
 
+export interface PokemonStat {
+  base_stat: number;
+  effort: number;
+  stat: {
+    name: string;
+    url: string;
+  };
+}
+
 export interface PokemonDetails {
   id: number;
   name: string;
@@ -43,4 +54,34 @@ export interface PokemonDetails {
   types: PokemonType[];
   height: number;
   weight: number;
+  base_experience: number;
+  stats: PokemonStat[];
+}
+
+// New interfaces for enhanced features
+export interface SearchOptions {
+  term: string;
+  types?: string[];
+  minId?: number;
+  maxId?: number;
+}
+
+export interface FavoritePokemon {
+  id: number;
+  name: string;
+  imageUrl: string;
+  addedAt: Date;
+}
+
+export interface ComparisonPokemon {
+  pokemon: Pokemon;
+  selected: boolean;
+}
+
+export type SortOption = 'id' | 'name' | 'type' | 'height' | 'weight';
+export type SortDirection = 'asc' | 'desc';
+
+export interface SortConfig {
+  option: SortOption;
+  direction: SortDirection;
 }

@@ -1,18 +1,22 @@
 .pokemon-card {
-  border-radius: 16px;
-  padding: 16px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s ease, box-shadow 0.2s ease; // ลด transition properties
-  cursor: pointer;
   position: relative;
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   overflow: hidden;
-  animation: slideInFromBottom 0.3s ease-out forwards; // ลดเวลาจาก 0.4s เป็น 0.3s
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  min-height: 200px;
+  animation: slideInFromBottom 0.6s ease forwards;
   opacity: 0;
   transform: translateY(20px);
-  border: 1px solid rgba(255, 255, 255, 0.2); // ลดจาก 2px เป็น 1px
-  contain: layout style paint; // เพิ่ม containment เพื่อ performance
+  will-change: transform, box-shadow;
 
-  // Layer 1: Blurred Pokemon Background
+  &.instant-show {
+    animation-duration: 0.3s;
+  }
+
+  // Enhanced glassmorphism with optimized GPU usage
   &::before {
     content: '';
     position: absolute;
@@ -24,13 +28,12 @@
     background-size: cover;
     background-position: top;
     background-repeat: no-repeat;
-    filter: blur(2px); // Further reduced from 4px to 2px for better performance
-    opacity: 0.2; // Reduced from 0.3 to 0.2
+    filter: blur(1px);
+    opacity: 0.15;
     z-index: 1;
-    transform: translateZ(0); // Force GPU acceleration
+    transform: translateZ(0);
   }
 
-  // Layer 2: White translucent overlay
   &::after {
     content: '';
     position: absolute;
@@ -38,22 +41,228 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(255, 255, 255, 0.72); // Increased opacity for better contrast
+    background: rgba(255, 255, 255, 0.75);
     z-index: 2;
-    transform: translateZ(0); // Force GPU acceleration
+    transform: translateZ(0);
   }
 
-  &:hover {
-    transform: translateY(-3px) scale(1.005); // Minimal hover effect for better performance
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12); // Reduced shadow
+  &:hover,
+  &.hovered,
+  &:focus-visible {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
     
     &::after {
-      background: rgba(255, 255, 255, 0.95); // Minimal change
+      background: rgba(255, 255, 255, 0.85);
     }
     
     .pokemon-image img.loaded {
-      transform: scale(1.03); // Minimal scale effect, no rotation
+      transform: scale(1.05);
     }
+    
+    .favorite-btn {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  &.selected {
+    border-color: #667eea;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.3);
+  }
+
+  &.favorite {
+    .favorite-btn {
+      opacity: 1;
+      color: #f59e0b;
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid #667eea;
+    outline-offset: 2px;
+  }
+}
+
+.card-inner {
+  text-align: center;
+  position: relative;
+  z-index: 3;
+  padding: 16px;
+}
+
+.pokemon-image {
+  margin-bottom: 12px;
+  height: 120px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  contain: layout size;
+
+  .image-placeholder {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.3s ease;
+
+    &.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .placeholder-content {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+    }
+
+    .placeholder-pokeball {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      border: 3px solid #e5e7eb;
+      position: relative;
+      animation: pokeball-pulse 1.5s ease-in-out infinite;
+
+      .pokeball-top,
+      .pokeball-bottom {
+        position: absolute;
+        width: 100%;
+        height: 50%;
+        border-radius: 30px 30px 0 0;
+      }
+
+      .pokeball-top {
+        top: -3px;
+        background: #ef4444;
+      }
+
+      .pokeball-bottom {
+        bottom: -3px;
+        background: #f3f4f6;
+        border-radius: 0 0 30px 30px;
+      }
+
+      .pokeball-middle {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 20px;
+        height: 20px;
+        background: white;
+        border: 3px solid #374151;
+        border-radius: 50%;
+      }
+    }
+  }
+
+  img {
+    max-width: 100%;
+    max-height: 100%;
+    width: 96px;
+    height: 96px;
+    object-fit: contain;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+    opacity: 0;
+    transform: scale(0.9);
+    transform-origin: center;
+    
+    &.loading {
+      opacity: 0;
+      transform: scale(0.9);
+    }
+    
+    &.loaded {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+}
+
+.pokemon-info {
+  .pokemon-id {
+    font-size: 0.875rem;
+    color: #6b7280;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .pokemon-name {
+    font-size: 1.125rem;
+    font-weight: 700;
+    margin: 0 0 8px 0;
+    color: #1f2937;
+    line-height: 1.2;
+  }
+
+  .pokemon-types {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    flex-wrap: wrap;
+
+    .type-badge {
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: white;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+      min-width: 45px;
+      text-align: center;
+    }
+  }
+}
+
+.favorite-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.8);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 4;
+  color: #6b7280;
+
+  &:hover {
+    background: rgba(255, 255, 255, 1);
+    transform: scale(1.1);
+    color: #f59e0b;
+  }
+
+  &.active {
+    color: #f59e0b;
+    opacity: 1;
+    transform: scale(1);
+
+    svg {
+      fill: currentColor;
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid #667eea;
+    outline-offset: 2px;
   }
 }
 
@@ -64,200 +273,48 @@
   }
 }
 
-.card-inner {
-  text-align: center;
-  position: relative;
-  z-index: 3;
-}
-
-.pokemon-image {
-  margin-bottom: 12px;
-  height: 120px;
-  width: 100%; // Fixed width to prevent layout shift
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  contain: layout size; // Enhanced containment for better CLS
-  aspect-ratio: 1; // Maintain aspect ratio to prevent layout shifts
-
-  // Image Placeholder/Skeleton
-  .image-placeholder {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
+@keyframes pokeball-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.05);
     opacity: 1;
-    transition: opacity 0.3s ease;
-    
-    &.hidden {
-      opacity: 0;
-      pointer-events: none;
-    }
-    
-    .placeholder-content {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      
-      .placeholder-pokeball {
-        width: 40px;
-        height: 40px;
-        position: relative;
-        animation: bounce 2s infinite ease-in-out; // เพิ่มเวลาเพื่อลด CPU usage
-        
-        .pokeball-top {
-          width: 40px;
-          height: 20px;
-          background: linear-gradient(180deg, #f85888 0%, #e53e3e 100%);
-          border-radius: 20px 20px 0 0;
-        }
-        
-        .pokeball-middle {
-          width: 40px;
-          height: 4px;
-          background: #2d3748;
-          position: relative;
-          
-          &::after {
-            content: '';
-            position: absolute;
-            left: 50%;
-            top: 50%;
-            transform: translate(-50%, -50%);
-            width: 12px;
-            height: 12px;
-            background: white;
-            border: 2px solid #2d3748;
-            border-radius: 50%;
-          }
-        }
-        
-        .pokeball-bottom {
-          width: 40px;
-          height: 20px;
-          background: linear-gradient(180deg, #e2e8f0 0%, #cbd5e0 100%);
-          border-radius: 0 0 20px 20px;
-        }
-      }
-    }
-  }
-
-  img {
-    max-width: 100%;
-    max-height: 100%;
-    width: 96px; // Fixed dimensions to prevent layout shift
-    height: 96px; // Fixed dimensions to prevent layout shift
-    object-fit: contain;
-    transition: transform 0.15s ease; // Reduced transition time
-    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1)); // Further reduced shadow
-    opacity: 0;
-    transform: scale(0.95); // Smaller initial scale
-    transform-origin: center;
-    
-    &.loading {
-      opacity: 0;
-      transform: scale(0.95);
-    }
-    
-    &.loaded {
-      opacity: 1;
-      transform: scale(1);
-    }
   }
 }
 
-@keyframes bounce {
-  0%, 20%, 53%, 80%, 100% {
-    transform: translate3d(0, 0, 0);
-  }
-  40%, 43% {
-    transform: translate3d(0, -4px, 0); // ลดจาก -8px เป็น -4px
-  }
-  70% {
-    transform: translate3d(0, -2px, 0);
-  }
-  90% {
-    transform: translate3d(0, -1px, 0); // ลดจาก -2px เป็น -1px
-  }
-}
-
-.pokemon-info {
-  color: #1f2937;
-}
-
-.pokemon-id {
-  font-size: 0.9rem;
-  opacity: 0.7;
-  font-weight: 600;
-  margin-bottom: 4px;
-  color: #6b7280;
-}
-
-.pokemon-name {
-  font-size: 1.1rem;
-  font-weight: 700;
-  margin: 0 0 8px 0;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-  color: #111827;
-}
-
-.pokemon-types {
-  display: flex;
-  gap: 6px;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
-.type-badge {
-  padding: 4px 8px;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: white;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-// การแสดงแบบเร็วสำหรับ cards ที่โหลดใหม่
-.pokemon-card.instant-show {
-  animation: quickFadeIn 0.15s ease-out forwards; // ลดเวลาจาก 0.2s เป็น 0.15s
-  
-  &:hover {
-    .pokemon-image img.loaded {
-      transform: scale(1.05) rotate(2deg); // ลด effect
-    }
-  }
-}
-
-@keyframes quickFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(8px); // ลดระยะจาก 10px เป็น 8px
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-// Responsive design
+// Mobile optimizations
 @media (max-width: 768px) {
   .pokemon-card {
+    min-height: 180px;
+
+    &:hover {
+      transform: translateY(-2px) scale(1.01);
+    }
+  }
+
+  .card-inner {
     padding: 12px;
   }
-  
+
   .pokemon-image {
     height: 100px;
+
+    img {
+      width: 80px;
+      height: 80px;
+    }
   }
-  
-  .pokemon-name {
-    font-size: 1rem;
+
+  .pokemon-info {
+    .pokemon-name {
+      font-size: 1rem;
+    }
+
+    .type-badge {
+      font-size: 0.7rem;
+      padding: 1px 6px;
+    }
   }
 }

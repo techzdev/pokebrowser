@@ -1,30 +1,60 @@
-import { Component, Input, OnInit, AfterViewInit } from '@angular/core';
+import { Component, Input, OnInit, AfterViewInit, HostListener, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Pokemon } from '../../models/pokemon.model';
+import { FavoritesService } from '../../services/favorites.service';
+import { TypeColorPipe } from '../../pipes/type-color.pipe';
 
 @Component({
   selector: 'app-pokemon-card',
-  imports: [CommonModule],
+  imports: [CommonModule, TypeColorPipe],
   templateUrl: './pokemon-card.html',
   styleUrl: './pokemon-card.scss'
 })
 export class PokemonCard implements OnInit, AfterViewInit {
   @Input() pokemon!: Pokemon;
   @Input() index: number = 0;
+  @Input() isSelectable: boolean = false;
+  @Input() isSelected: boolean = false;
+  
+  @Output() cardClick = new EventEmitter<Pokemon>();
+  @Output() favoriteToggle = new EventEmitter<Pokemon>();
+  
   imageLoaded = false;
   imageError = false;
+  isHovered = false;
+  isFavorite = false;
 
-  constructor() {}
+  constructor(private favoritesService: FavoritesService) {}
 
   ngOnInit(): void {
-    // Simplified preloading - just check if image exists
     if (this.pokemon.imageUrl) {
       this.preloadImage();
     }
+    
+    // Check if this Pokemon is in favorites
+    this.isFavorite = this.favoritesService.isFavorite(this.pokemon.id);
   }
 
   ngAfterViewInit(): void {
-    // No longer needed - using CSS custom properties directly in template
+    // Enhanced component is ready
+  }
+
+  @HostListener('mouseenter')
+  onMouseEnter(): void {
+    this.isHovered = true;
+  }
+
+  @HostListener('mouseleave')
+  onMouseLeave(): void {
+    this.isHovered = false;
+  }
+
+  @HostListener('keydown', ['$event'])
+  onKeyDown(event: KeyboardEvent): void {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      this.onCardClick();
+    }
   }
 
   private preloadImage(): void {
@@ -46,38 +76,41 @@ export class PokemonCard implements OnInit, AfterViewInit {
     img.src = this.pokemon.imageUrl;
   }
 
-  getTypeColor(type: string): string {
-    const colors: { [key: string]: string } = {
-      normal: '#A8A878',
-      fire: '#F08030',
-      water: '#6890F0',
-      electric: '#F8D030',
-      grass: '#78C850',
-      ice: '#98D8D8',
-      fighting: '#C03028',
-      poison: '#A040A0',
-      ground: '#E0C068',
-      flying: '#A890F0',
-      psychic: '#F85888',
-      bug: '#A8B820',
-      rock: '#B8A038',
-      ghost: '#705898',
-      dragon: '#7038F8',
-      dark: '#705848',
-      steel: '#B8B8D0',
-      fairy: '#EE99AC'
-    };
-    return colors[type] || '#68A090';
-  }
-
-  onImageError(event: any): void {
+  onImageError(event: Event): void {
     this.imageError = true;
-    event.target.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${this.pokemon.id}.png`;
+    const target = event.target as HTMLImageElement;
+    target.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${this.pokemon.id}.png`;
   }
 
   onImageLoad(): void {
     this.imageLoaded = true;
   }
 
-  // Removed getPokemonBgUrl() method - now using direct CSS custom property binding in template
+  onCardClick(): void {
+    this.cardClick.emit(this.pokemon);
+  }
+
+  onFavoriteClick(event: Event): void {
+    event.stopPropagation(); // Prevent card click
+    this.favoritesService.toggleFavorite(this.pokemon);
+    this.isFavorite = !this.isFavorite;
+    this.favoriteToggle.emit(this.pokemon);
+  }
+
+  get pokemonName(): string {
+    return this.pokemon.name.charAt(0).toUpperCase() + this.pokemon.name.slice(1);
+  }
+
+  get pokemonId(): string {
+    return `#${this.pokemon.id.toString().padStart(3, '0')}`;
+  }
+
+  get primaryType(): string {
+    return this.pokemon.types?.[0]?.type.name || 'unknown';
+  }
+
+  get cardAriaLabel(): string {
+    const types = this.pokemon.types?.map(t => t.type.name).join(', ') || 'unknown type';
+    return `${this.pokemonName}, ${this.pokemonId}, ${types} type Pokemon`;
+  }
 }
