@@ -1,55 +1,41 @@
 import { Component, OnInit, OnDestroy, HostListener, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ScrollingModule, CdkVirtualScrollViewport } from '@angular/cdk/scrolling';
+import { ScrollingModule } from '@angular/cdk/scrolling';
 import { Subject, takeUntil } from 'rxjs';
 import { PokemonService } from '../../services/pokemon.service';
-import { SearchService } from '../../services/search.service';
 import { PokemonCard } from '../pokemon-card/pokemon-card';
-import { SearchBar } from '../search-bar/search-bar';
 import { Pokemon } from '../../models/pokemon.model';
 
 @Component({
   selector: 'app-pokemon-grid',
-  imports: [CommonModule, ScrollingModule, PokemonCard, SearchBar],
+  imports: [CommonModule, ScrollingModule, PokemonCard],
   templateUrl: './pokemon-grid.html',
   styleUrl: './pokemon-grid.scss'
 })
 export class PokemonGrid implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('loadTrigger', { static: false }) loadTrigger?: ElementRef;
-  @ViewChild(CdkVirtualScrollViewport) viewport?: CdkVirtualScrollViewport;
   
   pokemon: Pokemon[] = [];
-  filteredPokemon: Pokemon[] = [];
   loading = false;
   error: string | null = null;
-  isLoadingMore = false;
+  isLoadingMore = false; // เปลี่ยนเป็น public
   showSkeletons = false;
   private destroy$ = new Subject<void>();
-  private preloadThreshold = 800;
+  private preloadThreshold = 800; // เพิ่มระยะโหลดล่วงหน้าเป็น 800px
   private isNearBottom = false;
   private intersectionObserver?: IntersectionObserver;
-  private lastKnownCount = 0;
+  private lastKnownCount = 0; // ติดตามจำนวน pokemon ก่อนหน้า
 
-  constructor(
-    private pokemonService: PokemonService,
-    private searchService: SearchService
-  ) {}
+  constructor(private pokemonService: PokemonService) {}
 
   ngOnInit(): void {
     this.pokemonService.pokemon$
       .pipe(takeUntil(this.destroy$))
       .subscribe(pokemon => {
         this.pokemon = pokemon;
-        this.searchService.updatePokemonList(pokemon);
         console.log('Pokemon loaded:', pokemon.length, 'items');
+        // อัปเดต lastKnownCount หลังจากมีข้อมูลใหม่
         this.lastKnownCount = pokemon.length;
-      });
-
-    // Subscribe to filtered pokemon from search service
-    this.searchService.filteredPokemon$
-      .pipe(takeUntil(this.destroy$))
-      .subscribe(filtered => {
-        this.filteredPokemon = filtered;
       });
 
     this.pokemonService.loading$
@@ -69,22 +55,7 @@ export class PokemonGrid implements OnInit, OnDestroy, AfterViewInit {
   }
 
   ngAfterViewInit(): void {
-    // Setup virtual scroll infinite loading
-    if (this.viewport) {
-      this.viewport.elementScrolled().pipe(
-        takeUntil(this.destroy$)
-      ).subscribe(() => {
-        const end = this.viewport!.getRenderedRange().end;
-        const total = this.viewport!.getDataLength();
-        
-        // Load more when approaching the end of virtual scroll
-        if (end >= total - 10 && !this.loading && !this.isLoadingMore && this.hasMorePokemon) {
-          this.loadMorePokemon();
-        }
-      });
-    }
-    
-    // Fallback intersection observer for load trigger
+    // ตั้งค่า Intersection Observer สำหรับการโหลดข้อมูลแบบ lazy loading
     if (this.loadTrigger) {
       this.intersectionObserver = new IntersectionObserver(
         (entries) => {
@@ -98,7 +69,7 @@ export class PokemonGrid implements OnInit, OnDestroy, AfterViewInit {
           });
         },
         {
-          rootMargin: '300px'
+          rootMargin: '300px' // โหลดล่วงหน้า 300px
         }
       );
       
@@ -110,6 +81,7 @@ export class PokemonGrid implements OnInit, OnDestroy, AfterViewInit {
     this.destroy$.next();
     this.destroy$.complete();
     
+    // ทำความสะอาด Intersection Observer
     if (this.intersectionObserver) {
       this.intersectionObserver.disconnect();
     }
@@ -117,14 +89,22 @@ export class PokemonGrid implements OnInit, OnDestroy, AfterViewInit {
 
   @HostListener('window:scroll', ['$event'])
   onScroll(event: any): void {
-    // Simplified scroll handling since virtual scrolling handles most performance
     const scrollPosition = window.pageYOffset;
     const documentHeight = document.documentElement.scrollHeight;
     const windowHeight = window.innerHeight;
     const distanceFromBottom = documentHeight - (scrollPosition + windowHeight);
     
+    // แสดง skeleton เมื่อใกล้ threshold (สำหรับ UX ที่ดีขึ้น)
     this.isNearBottom = distanceFromBottom <= this.preloadThreshold;
     this.showSkeletons = this.isNearBottom && this.hasMorePokemon && !this.isLoadingMore;
+    
+    // Fallback loading หากไม่มี Intersection Observer
+    if (distanceFromBottom <= 200 && 
+        !this.loading && 
+        !this.isLoadingMore && 
+        this.hasMorePokemon) {
+      this.loadMorePokemon();
+    }
   }
 
   private loadMorePokemon(): void {
@@ -135,6 +115,7 @@ export class PokemonGrid implements OnInit, OnDestroy, AfterViewInit {
       .subscribe({
         next: () => {
           this.isLoadingMore = false;
+          // ซ่อน skeleton หลังจากโหลดเสร็จ
           setTimeout(() => {
             this.showSkeletons = false;
           }, 200);
@@ -151,11 +132,13 @@ export class PokemonGrid implements OnInit, OnDestroy, AfterViewInit {
   }
 
   getDisplayIndex(index: number): number {
+    // Reset animation index every 12 items สำหรับ staggered animation
     return index % 12;
   }
 
   isRecentlyLoaded(index: number): boolean {
-    const initialLoadCount = 24;
+    // Cards ที่โหลดใหม่จะแสดงเร็วขึ้น โดยเปรียบเทียบกับ lastKnownCount
+    const initialLoadCount = 24; // จำนวน cards ที่โหลดครั้งแรก
     return index >= Math.max(initialLoadCount, this.lastKnownCount - 24);
   }
 

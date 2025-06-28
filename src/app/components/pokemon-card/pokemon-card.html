@@ -1,23 +1,13 @@
 <div class="pokemon-card" 
-     [class.hovered]="isHovered"
-     [class.selected]="isSelected"
-     [class.favorite]="isFavorite"
      [style.animation-delay.ms]="(index % 12) * 30"
-     [style.--pokemon-bg]="'url(' + (imageError ? 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/' + pokemon.id + '.png' : pokemon.imageUrl) + ')'"
-     (click)="onCardClick()"
-     [attr.role]="isSelectable ? 'button' : 'article'"
-     [attr.tabindex]="isSelectable ? '0' : null"
-     [attr.aria-label]="cardAriaLabel"
-     [attr.aria-pressed]="isSelectable ? isSelected : null">
-  
+     [style.--pokemon-bg]="'url(' + (imageError ? 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/' + pokemon.id + '.png' : pokemon.imageUrl) + ')'">
   <div class="card-inner">
     <div class="pokemon-image">
       <!-- Image Placeholder/Skeleton -->
       <div class="image-placeholder" 
-           [ngClass]="{'hidden': imageLoaded}"
-           [attr.aria-hidden]="imageLoaded">
+           [ngClass]="{'hidden': imageLoaded}">
         <div class="placeholder-content">
-          <div class="placeholder-pokeball" [attr.aria-label]="'Loading ' + pokemonName">
+          <div class="placeholder-pokeball">
             <div class="pokeball-top"></div>
             <div class="pokeball-middle"></div>
             <div class="pokeball-bottom"></div>
@@ -27,7 +17,7 @@
       
       <!-- Actual Image with fixed dimensions to prevent layout shift -->
       <img [src]="imageError ? 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/' + pokemon.id + '.png' : pokemon.imageUrl" 
-           [alt]="pokemonName + ' sprite'"
+           [alt]="pokemon.name"
            [ngClass]="{'loaded': imageLoaded, 'loading': !imageLoaded}"
            (load)="onImageLoad()"
            (error)="onImageError($event)"
@@ -35,30 +25,16 @@
            height="96"
            loading="lazy">
     </div>
-    
     <div class="pokemon-info">
-      <div class="pokemon-id" [attr.aria-label]="'Pokemon ID ' + pokemon.id">{{ pokemonId }}</div>
-      <h3 class="pokemon-name">{{ pokemonName }}</h3>
-      <div class="pokemon-types" *ngIf="pokemon.types" role="list" [attr.aria-label]="'Pokemon types'">
+      <div class="pokemon-id">#{{ pokemon.id.toString().padStart(3, '0') }}</div>
+      <h3 class="pokemon-name">{{ pokemon.name | titlecase }}</h3>
+      <div class="pokemon-types" *ngIf="pokemon.types">
         <span *ngFor="let typeInfo of pokemon.types" 
               class="type-badge"
-              role="listitem"
-              [style.background-color]="typeInfo.type.name | typeColor"
-              [attr.aria-label]="typeInfo.type.name + ' type'">
+              [style.background-color]="getTypeColor(typeInfo.type.name)">
           {{ typeInfo.type.name | titlecase }}
         </span>
       </div>
     </div>
-    
-    <!-- Favorite button -->
-    <button class="favorite-btn" 
-            [class.active]="isFavorite"
-            (click)="onFavoriteClick($event)"
-            [attr.aria-label]="(isFavorite ? 'Remove from' : 'Add to') + ' favorites'"
-            type="button">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"></polygon>
-      </svg>
-    </button>
   </div>
 </div>
