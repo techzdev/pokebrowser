@@ -2,6 +2,7 @@ import { Component, Input, OnInit, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { PokemonService } from '../../services/pokemon.service';
 import { PokemonDetails, PokemonSpecies, EvolutionChain, ChainLink } from '../../models/pokemon.model';
+import { getTypeColor } from '../../utils/pokemon-type-utils';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 
@@ -27,6 +28,8 @@ export class PokemonDetail implements OnInit {
   evolutionChain: EvolutionStage[] = [];
   loading = true;
   error = false;
+
+  private readonly MAX_STAT_VALUE = 255;
 
   constructor(private pokemonService: PokemonService) {}
 
@@ -117,27 +120,7 @@ export class PokemonDetail implements OnInit {
   }
 
   getTypeColor(type: string): string {
-    const colors: { [key: string]: string } = {
-      normal: '#A8A878',
-      fire: '#F08030',
-      water: '#6890F0',
-      electric: '#F8D030',
-      grass: '#78C850',
-      ice: '#98D8D8',
-      fighting: '#C03028',
-      poison: '#A040A0',
-      ground: '#E0C068',
-      flying: '#A890F0',
-      psychic: '#F85888',
-      bug: '#A8B820',
-      rock: '#B8A038',
-      ghost: '#705898',
-      dragon: '#7038F8',
-      dark: '#705848',
-      steel: '#B8B8D0',
-      fairy: '#EE99AC'
-    };
-    return colors[type] || '#68A090';
+    return getTypeColor(type);
   }
 
   getPrimaryType(): string {
@@ -212,8 +195,7 @@ export class PokemonDetail implements OnInit {
   }
 
   getStatPercentage(value: number): number {
-    // Max stat value is around 255
-    return Math.min((value / 255) * 100, 100);
+    return Math.min((value / this.MAX_STAT_VALUE) * 100, 100);
   }
 
   getEggGroups(): string {

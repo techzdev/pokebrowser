@@ -1,12 +1,8 @@
 import { Component, EventEmitter, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-
-export interface PokemonFilterData {
-  keyword: string;
-  types: string[];
-  generation: string;
-}
+import { PokemonFilterData } from '../../models/pokemon.model';
+import { getTypeColor, POKEMON_TYPES } from '../../utils/pokemon-type-utils';
 
 @Component({
   selector: 'app-pokemon-filter',
@@ -21,11 +17,7 @@ export class PokemonFilter {
   selectedTypes: string[] = [];
   selectedGeneration = 'all';
 
-  pokemonTypes = [
-    'normal', 'fire', 'water', 'electric', 'grass', 'ice',
-    'fighting', 'poison', 'ground', 'flying', 'psychic', 'bug',
-    'rock', 'ghost', 'dragon', 'dark', 'steel', 'fairy'
-  ];
+  pokemonTypes = POKEMON_TYPES;
 
   generations = [
     { value: 'all', label: 'All Generations' },
@@ -82,26 +74,6 @@ export class PokemonFilter {
   }
 
   getTypeColor(type: string): string {
-    const colors: { [key: string]: string } = {
-      normal: '#A8A878',
-      fire: '#F08030',
-      water: '#6890F0',
-      electric: '#F8D030',
-      grass: '#78C850',
-      ice: '#98D8D8',
-      fighting: '#C03028',
-      poison: '#A040A0',
-      ground: '#E0C068',
-      flying: '#A890F0',
-      psychic: '#F85888',
-      bug: '#A8B820',
-      rock: '#B8A038',
-      ghost: '#705898',
-      dragon: '#7038F8',
-      dark: '#705848',
-      steel: '#B8B8D0',
-      fairy: '#EE99AC'
-    };
-    return colors[type] || '#68A090';
+    return getTypeColor(type);
   }
 }

@@ -132,3 +132,9 @@ export interface EvolutionDetail {
     url: string;
   } | null;
 }
+
+export interface PokemonFilterData {
+  keyword: string;
+  types: string[];
+  generation: string;
+}

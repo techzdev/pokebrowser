@@ -4,9 +4,9 @@ import { ScrollingModule } from '@angular/cdk/scrolling';
 import { Subject, takeUntil } from 'rxjs';
 import { PokemonService } from '../../services/pokemon.service';
 import { PokemonCard } from '../pokemon-card/pokemon-card';
-import { PokemonFilter, PokemonFilterData } from '../pokemon-filter/pokemon-filter';
+import { PokemonFilter } from '../pokemon-filter/pokemon-filter';
 import { PokemonDetail } from '../pokemon-detail/pokemon-detail';
-import { Pokemon } from '../../models/pokemon.model';
+import { Pokemon, PokemonFilterData } from '../../models/pokemon.model';
 
 @Component({
   selector: 'app-pokemon-grid',
@@ -21,15 +21,15 @@ export class PokemonGrid implements OnInit, OnDestroy, AfterViewInit {
   filteredPokemon: Pokemon[] = [];
   loading = false;
   error: string | null = null;
-  isLoadingMore = false; // เปลี่ยนเป็น public
+  isLoadingMore = false; // Changed to public
   showSkeletons = false;
   selectedPokemonId: number | null = null;
   activeFilter: PokemonFilterData = { keyword: '', types: [], generation: 'all' };
   private destroy$ = new Subject<void>();
-  private preloadThreshold = 800; // เพิ่มระยะโหลดล่วงหน้าเป็น 800px
+  private preloadThreshold = 800; // Increased preload distance to 800px
   private isNearBottom = false;
   private intersectionObserver?: IntersectionObserver;
-  private lastKnownCount = 0; // ติดตามจำนวน pokemon ก่อนหน้า
+  private lastKnownCount = 0; // Track previous pokemon count
 
   constructor(private pokemonService: PokemonService) {}
 
@@ -40,7 +40,7 @@ export class PokemonGrid implements OnInit, OnDestroy, AfterViewInit {
         this.pokemon = pokemon;
         this.applyFilters();
         console.log('Pokemon loaded:', pokemon.length, 'items');
-        // อัปเดต lastKnownCount หลังจากมีข้อมูลใหม่
+        // Update lastKnownCount after new data arrives
         this.lastKnownCount = pokemon.length;
       });
 
