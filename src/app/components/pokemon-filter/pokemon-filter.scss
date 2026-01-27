@@ -1,9 +1,9 @@
 .filter-container {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 1.5rem;
-  border-radius: 16px;
-  margin-bottom: 2rem;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  margin-bottom: 0;
+  box-shadow: none;
 }
 
 .filter-header {
@@ -13,34 +13,39 @@
   margin-bottom: 1.5rem;
 
   h2 {
-    color: white;
-    font-size: 1.5rem;
+    color: #2d3748;
+    font-size: 1.25rem;
     margin: 0;
     font-weight: 600;
+    display: none; // Hidden since sidebar header has the title
   }
 }
 
 .clear-btn {
-  background: rgba(255, 255, 255, 0.2);
+  background: #667eea;
   color: white;
-  border: 2px solid white;
+  border: none;
   padding: 0.5rem 1rem;
   border-radius: 8px;
   cursor: pointer;
   font-weight: 500;
   transition: all 0.3s ease;
+  width: 100%;
+  margin-bottom: 1rem;
 
   &:hover {
-    background: white;
-    color: #667eea;
+    background: #764ba2;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
   }
 }
 
 .filter-section {
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(102, 126, 234, 0.05);
   padding: 1.25rem;
   border-radius: 12px;
   margin-bottom: 1rem;
+  border: 1px solid rgba(102, 126, 234, 0.1);
 
   &:last-child {
     margin-bottom: 0;

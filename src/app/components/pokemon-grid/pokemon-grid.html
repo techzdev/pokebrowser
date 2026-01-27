@@ -1,4 +1,31 @@
 <div class="pokemon-grid-container">
+  <!-- Filter Toggle Button -->
+  <button class="filter-toggle-btn" (click)="toggleSidebar()" [class.active]="isSidebarOpen">
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+    </svg>
+    <span class="filter-label">Filter</span>
+  </button>
+
+  <!-- Sidebar Overlay -->
+  <div class="sidebar-overlay" 
+       *ngIf="isSidebarOpen" 
+       (click)="closeSidebar()">
+  </div>
+
+  <!-- Filter Sidebar -->
+  <aside class="filter-sidebar" [class.open]="isSidebarOpen">
+    <div class="sidebar-header">
+      <h2>🔍 Filter Pokémon</h2>
+      <button class="close-sidebar-btn" (click)="closeSidebar()">×</button>
+    </div>
+    <div class="sidebar-content">
+      <app-pokemon-filter 
+        (filterChange)="onFilterChange($event)">
+      </app-pokemon-filter>
+    </div>
+  </aside>
+
   <header class="grid-header">
     <h1>Pokémon Browser</h1>
     <p>Discover and explore the world of Pokémon</p>
@@ -10,11 +37,6 @@
       </div>
     </div>
   </header>
-
-  <!-- Filter Component -->
-  <app-pokemon-filter 
-    (filterChange)="onFilterChange($event)">
-  </app-pokemon-filter>
 
   <!-- Results Count -->
   <div class="results-info" *ngIf="pokemon.length > 0">

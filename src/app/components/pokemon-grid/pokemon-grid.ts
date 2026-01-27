@@ -25,6 +25,7 @@ export class PokemonGrid implements OnInit, OnDestroy, AfterViewInit {
   showSkeletons = false;
   selectedPokemonId: number | null = null;
   activeFilter: PokemonFilterData = { keyword: '', types: [], generation: 'all' };
+  isSidebarOpen = false;
   private destroy$ = new Subject<void>();
   private preloadThreshold = 800; // Increased preload distance to 800px
   private isNearBottom = false;
@@ -206,5 +207,13 @@ export class PokemonGrid implements OnInit, OnDestroy, AfterViewInit {
 
   onCloseDetail(): void {
     this.selectedPokemonId = null;
+  }
+
+  toggleSidebar(): void {
+    this.isSidebarOpen = !this.isSidebarOpen;
+  }
+
+  closeSidebar(): void {
+    this.isSidebarOpen = false;
   }
 }
