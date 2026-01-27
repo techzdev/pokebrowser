@@ -4,13 +4,13 @@ import { ScrollingModule } from '@angular/cdk/scrolling';
 import { Subject, takeUntil } from 'rxjs';
 import { PokemonService } from '../../services/pokemon.service';
 import { PokemonCard } from '../pokemon-card/pokemon-card';
-import { PokemonFilter, PokemonFilter as PokemonFilterComponent } from '../pokemon-filter/pokemon-filter';
+import { PokemonFilter, PokemonFilterData } from '../pokemon-filter/pokemon-filter';
 import { PokemonDetail } from '../pokemon-detail/pokemon-detail';
 import { Pokemon } from '../../models/pokemon.model';
 
 @Component({
   selector: 'app-pokemon-grid',
-  imports: [CommonModule, ScrollingModule, PokemonCard, PokemonFilterComponent, PokemonDetail],
+  imports: [CommonModule, ScrollingModule, PokemonCard, PokemonFilter, PokemonDetail],
   templateUrl: './pokemon-grid.html',
   styleUrl: './pokemon-grid.scss'
 })
@@ -24,7 +24,7 @@ export class PokemonGrid implements OnInit, OnDestroy, AfterViewInit {
   isLoadingMore = false; // เปลี่ยนเป็น public
   showSkeletons = false;
   selectedPokemonId: number | null = null;
-  activeFilter: PokemonFilter = { keyword: '', types: [], generation: 'all' };
+  activeFilter: PokemonFilterData = { keyword: '', types: [], generation: 'all' };
   private destroy$ = new Subject<void>();
   private preloadThreshold = 800; // เพิ่มระยะโหลดล่วงหน้าเป็น 800px
   private isNearBottom = false;
@@ -156,7 +156,7 @@ export class PokemonGrid implements OnInit, OnDestroy, AfterViewInit {
     return this.pokemonService.hasMorePokemon();
   }
 
-  onFilterChange(filter: PokemonFilter): void {
+  onFilterChange(filter: PokemonFilterData): void {
     this.activeFilter = filter;
     this.applyFilters();
   }

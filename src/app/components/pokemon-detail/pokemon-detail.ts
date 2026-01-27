@@ -215,4 +215,9 @@ export class PokemonDetail implements OnInit {
     // Max stat value is around 255
     return Math.min((value / 255) * 100, 100);
   }
+
+  getEggGroups(): string {
+    if (!this.pokemonSpecies?.egg_groups) return '';
+    return this.pokemonSpecies.egg_groups.map(eg => eg.name).join(', ');
+  }
 }

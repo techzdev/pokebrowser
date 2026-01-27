@@ -34,7 +34,7 @@
         <!-- Pokemon Image -->
         <div class="pokemon-showcase">
           <img 
-            [src]="pokemonDetails.sprites?.other?.['official-artwork']?.front_default || pokemonDetails.sprites?.front_default" 
+            [src]="pokemonDetails.sprites.other['official-artwork'].front_default || pokemonDetails.sprites.front_default" 
             [alt]="pokemonDetails.name"
             class="pokemon-image">
         </div>
@@ -130,9 +130,7 @@
         <div class="additional-info" *ngIf="pokemonSpecies">
           <div class="info-item" *ngIf="pokemonSpecies.egg_groups && pokemonSpecies.egg_groups.length > 0">
             <div class="info-label">Egg Groups:</div>
-            <div class="info-value">
-              {{ pokemonSpecies.egg_groups.map(eg => eg.name).join(', ') | titlecase }}
-            </div>
+            <div class="info-value">{{ getEggGroups() | titlecase }}</div>
           </div>
           <div class="info-item" *ngIf="pokemonSpecies.habitat">
             <div class="info-label">Habitat:</div>

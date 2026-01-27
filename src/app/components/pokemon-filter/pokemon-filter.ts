@@ -2,7 +2,7 @@ import { Component, EventEmitter, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
-export interface PokemonFilter {
+export interface PokemonFilterData {
   keyword: string;
   types: string[];
   generation: string;
@@ -15,7 +15,7 @@ export interface PokemonFilter {
   styleUrl: './pokemon-filter.scss'
 })
 export class PokemonFilter {
-  @Output() filterChange = new EventEmitter<PokemonFilter>();
+  @Output() filterChange = new EventEmitter<PokemonFilterData>();
 
   keyword = '';
   selectedTypes: string[] = [];
