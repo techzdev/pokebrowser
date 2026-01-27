@@ -115,6 +115,89 @@ export class PokemonService {
     return this.currentOffset < this.totalCount;
   }
 
+  loadPokemonForGeneration(minId: number, maxId: number): Observable<Pokemon[]> {
+    // Check if we already have Pokemon in this range
+    const currentPokemon = this.pokemonSubject.value;
+    const hasDataInRange = currentPokemon.some(p => p.id >= minId && p.id <= maxId);
+    
+    if (hasDataInRange) {
+      // Already have some data in this range, return current state
+      return of(currentPokemon);
+    }
+    
+    // Load Pokemon starting from minId
+    const offset = minId - 1;
+    const limit = Math.min(50, maxId - minId + 1); // Load up to 50 Pokemon from the generation
+    
+    this.loadingSubject.next(true);
+    
+    if (this.useMockData) {
+      return timer(150).pipe(
+        map(() => {
+          const newPokemon = generateMockPokemon(offset, limit);
+          const currentPokemon = this.pokemonSubject.value;
+          
+          // Merge new Pokemon with existing ones, avoiding duplicates
+          const pokemonMap = new Map(currentPokemon.map(p => [p.id, p]));
+          newPokemon.forEach(p => pokemonMap.set(p.id, p));
+          
+          const updatedPokemon = Array.from(pokemonMap.values()).sort((a, b) => a.id - b.id);
+          this.pokemonSubject.next(updatedPokemon);
+          this.loadingSubject.next(false);
+          return updatedPokemon;
+        })
+      );
+    }
+    
+    // Try to load from API
+    return this.http.get<PokemonListResponse>(`${this.API_URL}/pokemon?limit=${limit}&offset=${offset}`)
+      .pipe(
+        switchMap(response => {
+          const detailRequests = response.results.map(pokemon => {
+            const id = this.extractIdFromUrl(pokemon.url);
+            return this.getPokemonDetails(id).pipe(
+              map(details => ({
+                ...pokemon,
+                id: details.id,
+                imageUrl: details.sprites.other['official-artwork'].front_default || 
+                         details.sprites.other.dream_world.front_default ||
+                         details.sprites.front_default,
+                sprites: details.sprites,
+                types: details.types,
+                height: details.height,
+                weight: details.weight
+              })),
+              catchError(() => of({
+                ...pokemon,
+                id: id,
+                imageUrl: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`
+              }))
+            );
+          });
+          
+          return forkJoin(detailRequests);
+        }),
+        map(newPokemon => {
+          const currentPokemon = this.pokemonSubject.value;
+          
+          // Merge new Pokemon with existing ones, avoiding duplicates
+          const pokemonMap = new Map(currentPokemon.map(p => [p.id, p]));
+          newPokemon.forEach(p => pokemonMap.set(p.id, p));
+          
+          const updatedPokemon = Array.from(pokemonMap.values()).sort((a, b) => a.id - b.id);
+          this.pokemonSubject.next(updatedPokemon);
+          this.loadingSubject.next(false);
+          return updatedPokemon;
+        }),
+        catchError(error => {
+          console.warn('API request failed for generation, switching to mock data:', error);
+          this.useMockData = true;
+          this.loadingSubject.next(false);
+          return this.loadPokemonForGeneration(minId, maxId);
+        })
+      );
+  }
+
   private extractIdFromUrl(url: string): number {
     const matches = url.match(/\/(\d+)\/$/);
     return matches ? parseInt(matches[1], 10) : 0;

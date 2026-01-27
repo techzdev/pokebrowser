@@ -159,7 +159,32 @@ export class PokemonGrid implements OnInit, OnDestroy, AfterViewInit {
 
   onFilterChange(filter: PokemonFilterData): void {
     this.activeFilter = filter;
-    this.applyFilters();
+    
+    // If generation filter is changed and not 'all', preload that generation's Pokemon
+    if (filter.generation !== 'all') {
+      const genRanges: { [key: string]: [number, number] } = {
+        '1': [1, 151],
+        '2': [152, 251],
+        '3': [252, 386],
+        '4': [387, 493],
+        '5': [494, 649],
+        '6': [650, 721],
+        '7': [722, 809],
+        '8': [810, 905],
+        '9': [906, 1008]
+      };
+      
+      const [minId, maxId] = genRanges[filter.generation];
+      
+      // Load Pokemon for this generation if not already loaded
+      this.pokemonService.loadPokemonForGeneration(minId, maxId)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe(() => {
+          this.applyFilters();
+        });
+    } else {
+      this.applyFilters();
+    }
   }
 
   applyFilters(): void {
