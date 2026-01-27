@@ -7,6 +7,7 @@ import { PokemonCard } from '../pokemon-card/pokemon-card';
 import { PokemonFilter } from '../pokemon-filter/pokemon-filter';
 import { PokemonDetail } from '../pokemon-detail/pokemon-detail';
 import { Pokemon, PokemonFilterData } from '../../models/pokemon.model';
+import { GENERATION_RANGES } from '../../utils/pokemon-type-utils';
 
 @Component({
   selector: 'app-pokemon-grid',
@@ -162,19 +163,7 @@ export class PokemonGrid implements OnInit, OnDestroy, AfterViewInit {
     
     // If generation filter is changed and not 'all', preload that generation's Pokemon
     if (filter.generation !== 'all') {
-      const genRanges: { [key: string]: [number, number] } = {
-        '1': [1, 151],
-        '2': [152, 251],
-        '3': [252, 386],
-        '4': [387, 493],
-        '5': [494, 649],
-        '6': [650, 721],
-        '7': [722, 809],
-        '8': [810, 905],
-        '9': [906, 1008]
-      };
-      
-      const [minId, maxId] = genRanges[filter.generation];
+      const [minId, maxId] = GENERATION_RANGES[filter.generation];
       
       // Load Pokemon for this generation if not already loaded
       this.pokemonService.loadPokemonForGeneration(minId, maxId)
@@ -208,18 +197,7 @@ export class PokemonGrid implements OnInit, OnDestroy, AfterViewInit {
 
     // Filter by generation (based on pokemon ID ranges)
     if (this.activeFilter.generation !== 'all') {
-      const genRanges: { [key: string]: [number, number] } = {
-        '1': [1, 151],
-        '2': [152, 251],
-        '3': [252, 386],
-        '4': [387, 493],
-        '5': [494, 649],
-        '6': [650, 721],
-        '7': [722, 809],
-        '8': [810, 905],
-        '9': [906, 1008]
-      };
-      const [min, max] = genRanges[this.activeFilter.generation] || [1, 1008];
+      const [min, max] = GENERATION_RANGES[this.activeFilter.generation] || [1, 1008];
       result = result.filter(p => p.id >= min && p.id <= max);
     }
 

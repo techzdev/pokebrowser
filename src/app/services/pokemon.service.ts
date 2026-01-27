@@ -192,8 +192,23 @@ export class PokemonService {
         catchError(error => {
           console.warn('API request failed for generation, switching to mock data:', error);
           this.useMockData = true;
-          this.loadingSubject.next(false);
-          return this.loadPokemonForGeneration(minId, maxId);
+          
+          // Use mock data directly instead of recursive call
+          return timer(150).pipe(
+            map(() => {
+              const newPokemon = generateMockPokemon(offset, limit);
+              const currentPokemon = this.pokemonSubject.value;
+              
+              // Merge new Pokemon with existing ones, avoiding duplicates
+              const pokemonMap = new Map(currentPokemon.map(p => [p.id, p]));
+              newPokemon.forEach(p => pokemonMap.set(p.id, p));
+              
+              const updatedPokemon = Array.from(pokemonMap.values()).sort((a, b) => a.id - b.id);
+              this.pokemonSubject.next(updatedPokemon);
+              this.loadingSubject.next(false);
+              return updatedPokemon;
+            })
+          );
         })
       );
   }
