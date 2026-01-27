@@ -11,13 +11,26 @@
     </div>
   </header>
 
+  <!-- Filter Component -->
+  <app-pokemon-filter 
+    (filterChange)="onFilterChange($event)">
+  </app-pokemon-filter>
+
+  <!-- Results Count -->
+  <div class="results-info" *ngIf="pokemon.length > 0">
+    <span class="results-count">
+      Showing {{ filteredPokemon.length }} of {{ pokemon.length }} Pokémon
+    </span>
+  </div>
+
   <div class="pokemon-grid" 
-       *ngIf="pokemon.length > 0">
+       *ngIf="filteredPokemon.length > 0">
     <app-pokemon-card 
-      *ngFor="let poke of pokemon; trackBy: trackByPokemon; let i = index"
+      *ngFor="let poke of filteredPokemon; trackBy: trackByPokemon; let i = index"
       [pokemon]="poke"
       [index]="getDisplayIndex(i)"
-      [class.instant-show]="isRecentlyLoaded(i)">
+      [class.instant-show]="isRecentlyLoaded(i)"
+      (click)="onPokemonClick(poke.id)">
     </app-pokemon-card>
     
     <!-- Skeleton Loading Cards สำหรับโหลดข้อมูลเพิ่มเติม -->
@@ -61,4 +74,18 @@
     <h3>No Pokémon found</h3>
     <p>Unable to load Pokémon data. Please check your connection and try again.</p>
   </div>
+
+  <!-- No Results from Filter -->
+  <div class="empty-state" *ngIf="!loading && pokemon.length > 0 && filteredPokemon.length === 0">
+    <div class="empty-icon">🔍</div>
+    <h3>No Pokémon match your filters</h3>
+    <p>Try adjusting your search criteria</p>
+  </div>
+
+  <!-- Detail Modal -->
+  <app-pokemon-detail 
+    *ngIf="selectedPokemonId"
+    [pokemonId]="selectedPokemonId"
+    (close)="onCloseDetail()">
+  </app-pokemon-detail>
 </div>

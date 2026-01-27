@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, BehaviorSubject, forkJoin, of, timer } from 'rxjs';
 import { map, switchMap, catchError, delay } from 'rxjs/operators';
-import { Pokemon, PokemonListResponse, PokemonDetails } from '../models/pokemon.model';
+import { Pokemon, PokemonListResponse, PokemonDetails, PokemonSpecies, EvolutionChain } from '../models/pokemon.model';
 import { generateMockPokemon } from '../models/mock-data';
 
 @Injectable({
@@ -101,6 +101,14 @@ export class PokemonService {
 
   getPokemonDetails(id: number): Observable<PokemonDetails> {
     return this.http.get<PokemonDetails>(`${this.API_URL}/pokemon/${id}`);
+  }
+
+  getPokemonSpecies(id: number): Observable<PokemonSpecies> {
+    return this.http.get<PokemonSpecies>(`${this.API_URL}/pokemon-species/${id}`);
+  }
+
+  getEvolutionChain(url: string): Observable<EvolutionChain> {
+    return this.http.get<EvolutionChain>(url);
   }
 
   hasMorePokemon(): boolean {

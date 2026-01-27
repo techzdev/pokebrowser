@@ -4,11 +4,13 @@ import { ScrollingModule } from '@angular/cdk/scrolling';
 import { Subject, takeUntil } from 'rxjs';
 import { PokemonService } from '../../services/pokemon.service';
 import { PokemonCard } from '../pokemon-card/pokemon-card';
+import { PokemonFilter, PokemonFilter as PokemonFilterComponent } from '../pokemon-filter/pokemon-filter';
+import { PokemonDetail } from '../pokemon-detail/pokemon-detail';
 import { Pokemon } from '../../models/pokemon.model';
 
 @Component({
   selector: 'app-pokemon-grid',
-  imports: [CommonModule, ScrollingModule, PokemonCard],
+  imports: [CommonModule, ScrollingModule, PokemonCard, PokemonFilterComponent, PokemonDetail],
   templateUrl: './pokemon-grid.html',
   styleUrl: './pokemon-grid.scss'
 })
@@ -16,10 +18,13 @@ export class PokemonGrid implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('loadTrigger', { static: false }) loadTrigger?: ElementRef;
   
   pokemon: Pokemon[] = [];
+  filteredPokemon: Pokemon[] = [];
   loading = false;
   error: string | null = null;
   isLoadingMore = false; // เปลี่ยนเป็น public
   showSkeletons = false;
+  selectedPokemonId: number | null = null;
+  activeFilter: PokemonFilter = { keyword: '', types: [], generation: 'all' };
   private destroy$ = new Subject<void>();
   private preloadThreshold = 800; // เพิ่มระยะโหลดล่วงหน้าเป็น 800px
   private isNearBottom = false;
@@ -33,6 +38,7 @@ export class PokemonGrid implements OnInit, OnDestroy, AfterViewInit {
       .pipe(takeUntil(this.destroy$))
       .subscribe(pokemon => {
         this.pokemon = pokemon;
+        this.applyFilters();
         console.log('Pokemon loaded:', pokemon.length, 'items');
         // อัปเดต lastKnownCount หลังจากมีข้อมูลใหม่
         this.lastKnownCount = pokemon.length;
@@ -148,5 +154,57 @@ export class PokemonGrid implements OnInit, OnDestroy, AfterViewInit {
 
   get hasMorePokemon(): boolean {
     return this.pokemonService.hasMorePokemon();
+  }
+
+  onFilterChange(filter: PokemonFilter): void {
+    this.activeFilter = filter;
+    this.applyFilters();
+  }
+
+  applyFilters(): void {
+    let result = [...this.pokemon];
+
+    // Filter by keyword (name or id)
+    if (this.activeFilter.keyword) {
+      const keyword = this.activeFilter.keyword.toLowerCase();
+      result = result.filter(p => 
+        p.name.toLowerCase().includes(keyword) || 
+        p.id.toString().includes(keyword)
+      );
+    }
+
+    // Filter by types
+    if (this.activeFilter.types.length > 0) {
+      result = result.filter(p => 
+        p.types?.some(t => this.activeFilter.types.includes(t.type.name))
+      );
+    }
+
+    // Filter by generation (based on pokemon ID ranges)
+    if (this.activeFilter.generation !== 'all') {
+      const genRanges: { [key: string]: [number, number] } = {
+        '1': [1, 151],
+        '2': [152, 251],
+        '3': [252, 386],
+        '4': [387, 493],
+        '5': [494, 649],
+        '6': [650, 721],
+        '7': [722, 809],
+        '8': [810, 905],
+        '9': [906, 1008]
+      };
+      const [min, max] = genRanges[this.activeFilter.generation] || [1, 1008];
+      result = result.filter(p => p.id >= min && p.id <= max);
+    }
+
+    this.filteredPokemon = result;
+  }
+
+  onPokemonClick(pokemonId: number): void {
+    this.selectedPokemonId = pokemonId;
+  }
+
+  onCloseDetail(): void {
+    this.selectedPokemonId = null;
   }
 }

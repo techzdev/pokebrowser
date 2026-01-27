@@ -111,6 +111,24 @@
   }
 }
 
+.results-info {
+  max-width: 1400px;
+  margin: 0 auto 1rem;
+  padding: 0 20px;
+  position: relative;
+  z-index: 2;
+
+  .results-count {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 8px;
+    font-weight: 600;
+    color: #4a5568;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+}
+
 .pokemon-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
