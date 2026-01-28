@@ -23,25 +23,18 @@ export class PokemonGrid implements OnInit, OnDestroy {
   activeFilter: PokemonFilterData = { keyword: '', types: [], generation: 'all' };
   isSidebarOpen = false;
   
-  // Pan and Zoom properties
+  // Pan properties (zoom removed)
   panX = 0;
   panY = 0;
-  zoom = 1;
   isPanning = false;
   private lastMouseX = 0;
   private lastMouseY = 0;
   private destroy$ = new Subject<void>();
   private loadingTimeoutId?: number;
   
-  // Constants for zoom and positioning
-  private readonly MIN_ZOOM = 0.3;
-  private readonly MAX_ZOOM = 3;
-  private readonly ZOOM_STEP = 0.2;
-  private readonly ZOOM_SENSITIVITY = 0.001;
+  // Constants for positioning (grid layout)
   private readonly CARD_SPACING = 350;
-  private readonly COLUMNS = 8;
-  private readonly STAGGER_OFFSET = 100;
-  private readonly ALTERNATE_OFFSET = 50;
+  private readonly COLUMNS = 6;
   private readonly MAX_POKEMON = 500;
 
   constructor(private pokemonService: PokemonService) {}
@@ -130,67 +123,46 @@ export class PokemonGrid implements OnInit, OnDestroy {
   onWheel(event: WheelEvent): void {
     event.preventDefault();
     
-    // Check if it's a pinch-to-zoom gesture (ctrlKey is set for trackpad pinch)
-    if (event.ctrlKey) {
-      // Zoom
-      const zoomDelta = -event.deltaY * this.ZOOM_SENSITIVITY;
-      const newZoom = Math.max(this.MIN_ZOOM, Math.min(this.MAX_ZOOM, this.zoom + zoomDelta));
-      
-      // Zoom towards cursor position
-      const target = event.currentTarget as HTMLElement;
-      if (target) {
-        const rect = target.getBoundingClientRect();
-        const x = event.clientX - rect.left;
-        const y = event.clientY - rect.top;
-        
-        const dx = x - rect.width / 2;
-        const dy = y - rect.height / 2;
-        
-        this.panX += dx * (1 - newZoom / this.zoom);
-        this.panY += dy * (1 - newZoom / this.zoom);
-        this.zoom = newZoom;
-      }
-    } else {
-      // Pan with trackpad (2-finger scroll)
-      this.panX -= event.deltaX;
-      this.panY -= event.deltaY;
+    // Infinite scrolling with wrapping - pan in any direction
+    this.panX -= event.deltaX;
+    this.panY -= event.deltaY;
+    
+    // Calculate grid dimensions
+    const totalCards = this.filteredPokemon.length;
+    if (totalCards === 0) return;
+    
+    const rows = Math.ceil(totalCards / this.COLUMNS);
+    const gridWidth = this.COLUMNS * this.CARD_SPACING;
+    const gridHeight = rows * this.CARD_SPACING;
+    
+    // Wrap horizontally (infinite scroll)
+    if (this.panX > gridWidth / 2) {
+      this.panX -= gridWidth;
+    } else if (this.panX < -gridWidth / 2) {
+      this.panX += gridWidth;
+    }
+    
+    // Wrap vertically (infinite scroll)
+    if (this.panY > gridHeight / 2) {
+      this.panY -= gridHeight;
+    } else if (this.panY < -gridHeight / 2) {
+      this.panY += gridHeight;
     }
   }
 
   getTransform(): string {
-    return `translate(${this.panX}px, ${this.panY}px) scale(${this.zoom})`;
+    return `translate(${this.panX}px, ${this.panY}px)`;
   }
 
-  zoomIn(): void {
-    this.zoom = Math.min(this.MAX_ZOOM, this.zoom + this.ZOOM_STEP);
-  }
-
-  zoomOut(): void {
-    this.zoom = Math.max(this.MIN_ZOOM, this.zoom - this.ZOOM_STEP);
-  }
-
-  resetZoom(): void {
-    this.zoom = 1;
-    this.panX = 0;
-    this.panY = 0;
-  }
-
-  // Position Pokemon at specific coordinates
+  // Position Pokemon at specific coordinates in a grid
   getPokemonX(index: number): number {
-    // Create a non-linear layout pattern
     const col = index % this.COLUMNS;
-    const row = Math.floor(index / this.COLUMNS);
-    const baseX = col * this.CARD_SPACING;
-    const offsetX = (row % 3) * this.STAGGER_OFFSET; // Stagger every 3 rows
-    return baseX + offsetX + this.ALTERNATE_OFFSET;
+    return col * this.CARD_SPACING + 50;
   }
 
   getPokemonY(index: number): number {
     const row = Math.floor(index / this.COLUMNS);
-    const baseY = row * this.CARD_SPACING;
-    const col = index % this.COLUMNS;
-    const offsetY = (col % 2) * this.ALTERNATE_OFFSET; // Alternate columns
-    return baseY + offsetY + this.ALTERNATE_OFFSET;
+    return row * this.CARD_SPACING + 50;
   }
 
   trackByPokemon(index: number, pokemon: Pokemon): number {

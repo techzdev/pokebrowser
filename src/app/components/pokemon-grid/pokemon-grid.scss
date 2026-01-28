@@ -74,45 +74,6 @@
   }
 }
 
-// Zoom Controls
-.zoom-controls {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  z-index: 1000;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  background: rgba(255, 255, 255, 0.95);
-  padding: 12px;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  backdrop-filter: blur(10px);
-
-  .zoom-btn {
-    width: 40px;
-    height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    
-    &:hover {
-      transform: scale(1.1);
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-    }
-    
-    &:active {
-      transform: scale(0.95);
-    }
-  }
-}
-
 .filter-toggle-btn {
   position: fixed;
   bottom: 30px;
@@ -378,18 +339,6 @@
 
 // Responsive design
 @media (max-width: 768px) {
-  .zoom-controls {
-    top: 10px;
-    right: 10px;
-    padding: 8px;
-    gap: 6px;
-    
-    .zoom-btn {
-      width: 36px;
-      height: 36px;
-    }
-  }
-
   .filter-toggle-btn {
     bottom: 20px;
     padding: 0.6rem 1rem;
@@ -414,18 +363,6 @@
 }
 
 @media (max-width: 480px) {
-  .zoom-controls {
-    .zoom-btn {
-      width: 32px;
-      height: 32px;
-      
-      svg {
-        width: 16px;
-        height: 16px;
-      }
-    }
-  }
-
   .filter-toggle-btn {
     bottom: 15px;
     padding: 0.5rem 0.85rem;
