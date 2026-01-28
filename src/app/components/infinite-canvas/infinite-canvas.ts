@@ -6,11 +6,13 @@ import {
   signal,
   computed,
   effect,
-  ElementRef
+  ElementRef,
+  ChangeDetectionStrategy
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Subject, takeUntil } from 'rxjs';
+import { ImagePrefetchService } from '../../services/image-prefetch.service';
 
 interface Pokemon {
   name: string;
@@ -34,6 +36,7 @@ interface PokemonCardData {
   gridPos: GridPosition;
   screenX: number;
   screenY: number;
+  stableKey: string; // Unique stable identifier for this card
 }
 
 @Component({
@@ -41,7 +44,8 @@ interface PokemonCardData {
   standalone: true,
   imports: [CommonModule],
   templateUrl: './infinite-canvas.html',
-  styleUrl: './infinite-canvas.scss'
+  styleUrl: './infinite-canvas.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class InfiniteCanvas implements OnInit, OnDestroy {
   // Signals for state management
@@ -72,11 +76,20 @@ export class InfiniteCanvas implements OnInit, OnDestroy {
   private readonly GRID_CELL_SIZE = 40;
   private readonly TOTAL_POKEMON_COUNT = 1025; // Total number of Pokémon in the Pokédex
   
+  // Buffer configuration for seamless loading
+  private readonly BUFFER_MULTIPLIER = 2; // Render area 2x larger than viewport
+  private readonly UPDATE_THRESHOLD = 200; // Update when moved 200px from buffer center
+  
   private destroy$ = new Subject<void>();
   private isPanning = false;
   private lastTouchX = 0;
   private lastTouchY = 0;
   private boundHandleWheel: (event: WheelEvent) => void;
+  
+  // Buffer center tracking
+  private bufferCenterX = signal(0);
+  private bufferCenterY = signal(0);
+  private lastScrollDirection = { x: 0, y: 0 };
 
   // Expose signals to template
   currentOffsetX = computed(() => this.offsetX());
@@ -84,10 +97,28 @@ export class InfiniteCanvas implements OnInit, OnDestroy {
   loading = computed(() => this.isLoading());
   error = computed(() => this.errorMessage());
 
-  constructor(private http: HttpClient, private elementRef: ElementRef) {
+  constructor(private http: HttpClient, private elementRef: ElementRef, private imagePrefetch: ImagePrefetchService) {
     // Track position changes for reactive updates
     // Bind the wheel handler once in constructor to ensure same reference for add/remove
     this.boundHandleWheel = this.handleWheel.bind(this);
+    
+    // Initialize buffer center
+    this.bufferCenterX.set(0);
+    this.bufferCenterY.set(0);
+    
+    // Effect to update buffer center when offset changes significantly
+    effect(() => {
+      const x = this.offsetX();
+      const y = this.offsetY();
+      
+      const distanceFromBufferX = Math.abs(x - this.bufferCenterX());
+      const distanceFromBufferY = Math.abs(y - this.bufferCenterY());
+      
+      if (distanceFromBufferX > this.UPDATE_THRESHOLD || distanceFromBufferY > this.UPDATE_THRESHOLD) {
+        this.bufferCenterX.set(x);
+        this.bufferCenterY.set(y);
+      }
+    });
   }
 
   ngOnInit(): void {
@@ -232,20 +263,33 @@ export class InfiniteCanvas implements OnInit, OnDestroy {
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
     
+    // Use buffer center for calculations
+    const centerX = this.bufferCenterX();
+    const centerY = this.bufferCenterY();
+    
     // Calculate card + gap size
     const cellWidth = this.CARD_WIDTH + this.CARD_GAP;
     const cellHeight = this.CARD_HEIGHT + this.CARD_GAP;
     
-    // Calculate which grid cells are visible based on offset
-    // Determine the top-left grid position in viewport
-    const startCol = Math.floor(-offsetX / cellWidth);
-    const startRow = Math.floor(-offsetY / cellHeight);
+    // Extended viewport (2x buffer)
+    const bufferedWidth = viewportWidth * this.BUFFER_MULTIPLIER;
+    const bufferedHeight = viewportHeight * this.BUFFER_MULTIPLIER;
     
-    // Calculate how many columns and rows we need to fill the viewport
-    const numCols = Math.ceil(viewportWidth / cellWidth) + 2; // +2 for partial cells
-    const numRows = Math.ceil(viewportHeight / cellHeight) + 2;
+    // Calculate which grid cells are visible based on buffer center
+    const startCol = Math.floor(-centerX / cellWidth) - Math.ceil(bufferedWidth / cellWidth / 2);
+    const startRow = Math.floor(-centerY / cellHeight) - Math.ceil(bufferedHeight / cellHeight / 2);
+    
+    // Calculate how many columns and rows we need to fill the buffered viewport
+    const numCols = Math.ceil(bufferedWidth / cellWidth) + 4; // +4 for extra buffer
+    const numRows = Math.ceil(bufferedHeight / cellHeight) + 4;
     
     const visibleCards: PokemonCardData[] = [];
+    const imagesToPrefetch: string[] = [];
+    
+    // Track scroll direction for pre-fetching
+    const scrollDirX = offsetX - this.bufferCenterX();
+    const scrollDirY = offsetY - this.bufferCenterY();
+    this.lastScrollDirection = { x: scrollDirX, y: scrollDirY };
     
     // Generate visible cards based on grid position
     for (let row = startRow; row < startRow + numRows; row++) {
@@ -264,21 +308,38 @@ export class InfiniteCanvas implements OnInit, OnDestroy {
         const screenX = col * cellWidth + offsetX;
         const screenY = row * cellHeight + offsetY;
         
-        // Only add if within viewport bounds (with small buffer)
-        if (
-          screenX + this.CARD_WIDTH >= -this.CARD_GAP &&
-          screenX <= viewportWidth + this.CARD_GAP &&
-          screenY + this.CARD_HEIGHT >= -this.CARD_GAP &&
-          screenY <= viewportHeight + this.CARD_GAP
-        ) {
+        // Check if within buffered viewport bounds
+        const inBufferedViewport = 
+          screenX + this.CARD_WIDTH >= -bufferedWidth / 2 &&
+          screenX <= viewportWidth + bufferedWidth / 2 &&
+          screenY + this.CARD_HEIGHT >= -bufferedHeight / 2 &&
+          screenY <= viewportHeight + bufferedHeight / 2;
+        
+        if (inBufferedViewport) {
+          // Create stable key based on grid position and pokemon ID
+          const stableKey = `${row}-${col}-${pokemonId}`;
+          
           visibleCards.push({
             pokemon: pokemonData,
             gridPos: { row, col },
             screenX,
-            screenY
+            screenY,
+            stableKey
           });
+          
+          // Add to pre-fetch list if not already cached
+          if (!this.imagePrefetch.isCached(pokemonData.imageUrl)) {
+            imagesToPrefetch.push(pokemonData.imageUrl);
+          }
         }
       }
+    }
+    
+    // Pre-fetch images in the scroll direction
+    if (imagesToPrefetch.length > 0) {
+      // Prioritize images in scroll direction
+      this.imagePrefetch.prefetchImages(imagesToPrefetch.slice(0, 20))
+        .catch(err => console.warn('Image pre-fetch failed:', err));
     }
     
     return visibleCards;
@@ -304,8 +365,8 @@ export class InfiniteCanvas implements OnInit, OnDestroy {
     return `translate3d(${card.screenX}px, ${card.screenY}px, 0)`;
   }
 
-  trackByPokemon(index: number, card: PokemonCardData): number {
-    return card.pokemon.id;
+  trackByPokemon(index: number, card: PokemonCardData): string {
+    return card.stableKey;
   }
 
   formatPokemonName(name: string): string {

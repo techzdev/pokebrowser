@@ -35,29 +35,30 @@
 
   <!-- Canvas viewport -->
   <div class="canvas-viewport">
-    <!-- Pokemon cards -->
-    <div
-      *ngFor="let card of visiblePokemon(); trackBy: trackByPokemon"
-      class="pokemon-card bento-card"
-      [style.transform]="getTransform(card)"
-      tabindex="0"
-      role="button"
-      [attr.aria-label]="'Pokemon ' + formatPokemonName(card.pokemon.name) + ', number ' + card.pokemon.id"
-    >
-      <div class="card-content">
-        <div class="card-image">
-          <img 
-            [src]="card.pokemon.imageUrl" 
-            [alt]="card.pokemon.name"
-            loading="lazy"
-          />
-        </div>
-        <div class="card-info">
-          <div class="pokemon-id" aria-hidden="true">#{{ card.pokemon.id.toString().padStart(3, '0') }}</div>
-          <h3 class="pokemon-name">{{ formatPokemonName(card.pokemon.name) }}</h3>
+    <!-- Pokemon cards with @for and track for stable identity -->
+    @for (card of visiblePokemon(); track card.stableKey) {
+      <div
+        class="pokemon-card bento-card card-fade-in"
+        [style.transform]="getTransform(card)"
+        tabindex="0"
+        role="button"
+        [attr.aria-label]="'Pokemon ' + formatPokemonName(card.pokemon.name) + ', number ' + card.pokemon.id"
+      >
+        <div class="card-content">
+          <div class="card-image">
+            <img 
+              [src]="card.pokemon.imageUrl" 
+              [alt]="card.pokemon.name"
+              loading="lazy"
+            />
+          </div>
+          <div class="card-info">
+            <div class="pokemon-id" aria-hidden="true">#{{ card.pokemon.id.toString().padStart(3, '0') }}</div>
+            <h3 class="pokemon-name">{{ formatPokemonName(card.pokemon.name) }}</h3>
+          </div>
         </div>
       </div>
-    </div>
+    }
   </div>
 
   <!-- Position indicator (debug) -->
