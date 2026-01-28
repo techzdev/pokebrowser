@@ -25,6 +25,9 @@ export interface PokemonSprites {
     dream_world: {
       front_default: string;
     };
+    home: {
+      front_default: string;
+    };
   };
 }
 
