@@ -36,6 +36,11 @@ export class PokemonGrid implements OnInit, OnDestroy {
   private readonly CARD_SPACING = 350;
   private readonly COLUMNS = 6;
   private readonly MAX_POKEMON = 500;
+  
+  // Tile offsets for seamless infinite scrolling (3x3 grid of tiles)
+  tileOffsets: { x: number, y: number }[] = [];
+  private gridWidth = 0;
+  private gridHeight = 0;
 
   constructor(private pokemonService: PokemonService) {}
 
@@ -45,6 +50,7 @@ export class PokemonGrid implements OnInit, OnDestroy {
       .subscribe(pokemon => {
         this.pokemon = pokemon;
         this.applyFilters();
+        this.updateTileOffsets();
         console.log('Pokemon loaded:', pokemon.length, 'items');
       });
 
@@ -62,6 +68,29 @@ export class PokemonGrid implements OnInit, OnDestroy {
 
     // Load all Pokemon at once for infinite canvas view
     this.loadAllPokemon();
+  }
+  
+  private updateTileOffsets(): void {
+    const totalCards = this.filteredPokemon.length;
+    if (totalCards === 0) {
+      this.tileOffsets = [];
+      return;
+    }
+    
+    const rows = Math.ceil(totalCards / this.COLUMNS);
+    this.gridWidth = this.COLUMNS * this.CARD_SPACING;
+    this.gridHeight = rows * this.CARD_SPACING;
+    
+    // Create 3x3 grid of tiles for seamless infinite scrolling
+    this.tileOffsets = [];
+    for (let x = -1; x <= 1; x++) {
+      for (let y = -1; y <= 1; y++) {
+        this.tileOffsets.push({
+          x: x * this.gridWidth,
+          y: y * this.gridHeight
+        });
+      }
+    }
   }
 
   private loadAllPokemon(): void {
@@ -123,30 +152,28 @@ export class PokemonGrid implements OnInit, OnDestroy {
   onWheel(event: WheelEvent): void {
     event.preventDefault();
     
-    // Infinite scrolling with wrapping - pan in any direction
+    // Infinite scrolling - pan in any direction
     this.panX -= event.deltaX;
     this.panY -= event.deltaY;
     
-    // Calculate grid dimensions
-    const totalCards = this.filteredPokemon.length;
-    if (totalCards === 0) return;
-    
-    const rows = Math.ceil(totalCards / this.COLUMNS);
-    const gridWidth = this.COLUMNS * this.CARD_SPACING;
-    const gridHeight = rows * this.CARD_SPACING;
-    
-    // Wrap horizontally (infinite scroll)
-    if (this.panX > gridWidth / 2) {
-      this.panX -= gridWidth;
-    } else if (this.panX < -gridWidth / 2) {
-      this.panX += gridWidth;
+    // Seamless wrapping when crossing tile boundaries
+    if (this.gridWidth > 0) {
+      // Modulo wrapping for truly infinite coordinates
+      while (this.panX > this.gridWidth) {
+        this.panX -= this.gridWidth;
+      }
+      while (this.panX < 0) {
+        this.panX += this.gridWidth;
+      }
     }
     
-    // Wrap vertically (infinite scroll)
-    if (this.panY > gridHeight / 2) {
-      this.panY -= gridHeight;
-    } else if (this.panY < -gridHeight / 2) {
-      this.panY += gridHeight;
+    if (this.gridHeight > 0) {
+      while (this.panY > this.gridHeight) {
+        this.panY -= this.gridHeight;
+      }
+      while (this.panY < 0) {
+        this.panY += this.gridHeight;
+      }
     }
   }
 
@@ -218,6 +245,7 @@ export class PokemonGrid implements OnInit, OnDestroy {
     }
 
     this.filteredPokemon = result;
+    this.updateTileOffsets();
   }
 
   onPokemonClick(pokemonId: number): void {

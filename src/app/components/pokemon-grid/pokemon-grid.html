@@ -14,17 +14,20 @@
        [style.transform]="getTransform()"
        [style.cursor]="isPanning ? 'grabbing' : 'grab'">
     
-    <!-- Pokemon Cards positioned at coordinates -->
+    <!-- Render tiled instances for seamless infinite scrolling -->
     <div class="pokemon-workspace">
-      <app-pokemon-card 
-        *ngFor="let poke of filteredPokemon; trackBy: trackByPokemon; let i = index"
-        [pokemon]="poke"
-        [index]="getDisplayIndex(i)"
-        [style.left.px]="getPokemonX(i)"
-        [style.top.px]="getPokemonY(i)"
-        class="positioned-card"
-        (click)="onPokemonClick(poke.id)">
-      </app-pokemon-card>
+      <!-- Render 9 tiles (3x3 grid) to create seamless infinite appearance -->
+      <ng-container *ngFor="let tileOffset of tileOffsets">
+        <app-pokemon-card 
+          *ngFor="let poke of filteredPokemon; trackBy: trackByPokemon; let i = index"
+          [pokemon]="poke"
+          [index]="getDisplayIndex(i)"
+          [style.left.px]="getPokemonX(i) + tileOffset.x"
+          [style.top.px]="getPokemonY(i) + tileOffset.y"
+          class="positioned-card"
+          (click)="onPokemonClick(poke.id)">
+        </app-pokemon-card>
+      </ng-container>
     </div>
   </div>
 
