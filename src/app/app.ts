@@ -1,10 +1,10 @@
 import { Component } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { PokemonGrid } from './components/pokemon-grid/pokemon-grid';
+import { InfiniteCanvas } from './components/infinite-canvas/infinite-canvas';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, PokemonGrid],
+  imports: [RouterOutlet, InfiniteCanvas],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })

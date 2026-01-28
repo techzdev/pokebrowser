@@ -1,0 +1,59 @@
+<div class="infinite-canvas-container">
+  <!-- Background grid that moves with canvas -->
+  <div class="background-grid" [style.background-position]="getBackgroundOffset()"></div>
+  
+  <!-- Loading indicator -->
+  <div class="loading-overlay" *ngIf="loading()">
+    <div class="pokeball-spinner">
+      <div class="pokeball">
+        <div class="pokeball-top"></div>
+        <div class="pokeball-bottom"></div>
+        <div class="pokeball-center">
+          <div class="pokeball-button"></div>
+        </div>
+      </div>
+    </div>
+    <p class="loading-text">Loading Pokémon...</p>
+  </div>
+
+  <!-- Instructions overlay -->
+  <div class="instructions">
+    <div class="instruction-card">
+      <h2>🎮 Infinite Pokémon Canvas</h2>
+      <p>Use trackpad scroll or drag to explore</p>
+      <p class="hint">The canvas loops infinitely!</p>
+    </div>
+  </div>
+
+  <!-- Canvas viewport -->
+  <div class="canvas-viewport">
+    <!-- Pokemon cards -->
+    <div
+      *ngFor="let card of visiblePokemon(); trackBy: trackByPokemon"
+      class="pokemon-card bento-card"
+      [style.transform]="getTransform(card)"
+    >
+      <div class="card-content">
+        <div class="card-image">
+          <img 
+            [src]="card.pokemon.imageUrl" 
+            [alt]="card.pokemon.name"
+            loading="lazy"
+          />
+        </div>
+        <div class="card-info">
+          <div class="pokemon-id">#{{ card.pokemon.id.toString().padStart(3, '0') }}</div>
+          <h3 class="pokemon-name">{{ formatPokemonName(card.pokemon.name) }}</h3>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Position indicator (debug) -->
+  <div class="position-indicator">
+    <div class="indicator-content">
+      <span>X: {{ currentOffsetX().toFixed(0) }}</span>
+      <span>Y: {{ currentOffsetY().toFixed(0) }}</span>
+    </div>
+  </div>
+</div>
