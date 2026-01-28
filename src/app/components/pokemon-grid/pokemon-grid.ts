@@ -1,222 +1,94 @@
-import { Component, OnInit, OnDestroy, HostListener, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { ScrollingModule } from '@angular/cdk/scrolling';
-import { Subject, takeUntil } from 'rxjs';
+import { Component, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef, ChangeDetectionStrategy, signal, inject } from '@angular/core';
 import { PokemonService } from '../../services/pokemon.service';
 import { PokemonCard } from '../pokemon-card/pokemon-card';
-import { PokemonFilter } from '../pokemon-filter/pokemon-filter';
-import { PokemonDetail } from '../pokemon-detail/pokemon-detail';
-import { Pokemon, PokemonFilterData } from '../../models/pokemon.model';
-import { GENERATION_RANGES } from '../../utils/pokemon-type-utils';
+import { Pokemon } from '../../models/pokemon.model';
 
 @Component({
   selector: 'app-pokemon-grid',
-  imports: [CommonModule, ScrollingModule, PokemonCard, PokemonFilter, PokemonDetail],
+  standalone: true,
+  imports: [PokemonCard],
   templateUrl: './pokemon-grid.html',
-  styleUrl: './pokemon-grid.scss'
+  styleUrl: './pokemon-grid.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PokemonGrid implements OnInit, OnDestroy, AfterViewInit {
-  @ViewChild('loadTrigger', { static: false }) loadTrigger?: ElementRef;
+  @ViewChild('loadTrigger') loadTrigger?: ElementRef;
   
-  pokemon: Pokemon[] = [];
-  filteredPokemon: Pokemon[] = [];
-  loading = false;
-  error: string | null = null;
-  isLoadingMore = false; // Changed to public
-  showSkeletons = false;
-  selectedPokemonId: number | null = null;
-  activeFilter: PokemonFilterData = { keyword: '', types: [], generation: 'all' };
-  isSidebarOpen = false;
-  private destroy$ = new Subject<void>();
-  private preloadThreshold = 800; // Increased preload distance to 800px
-  private isNearBottom = false;
-  private intersectionObserver?: IntersectionObserver;
-  private lastKnownCount = 0; // Track previous pokemon count
+  // Inject service
+  private pokemonService = inject(PokemonService);
 
-  constructor(private pokemonService: PokemonService) {}
+  // Local signal for tracking load trigger
+  private isLoadingMore = signal(false);
+  private observer?: IntersectionObserver;
+
+  // Signals from service (accessed after initialization)
+  pokemonList = this.pokemonService.pokemonList;
+  loading = this.pokemonService.loading;
+  hasMore = this.pokemonService.hasMore;
 
   ngOnInit(): void {
-    this.pokemonService.pokemon$
-      .pipe(takeUntil(this.destroy$))
-      .subscribe(pokemon => {
-        this.pokemon = pokemon;
-        this.applyFilters();
-        console.log('Pokemon loaded:', pokemon.length, 'items');
-        // Update lastKnownCount after new data arrives
-        this.lastKnownCount = pokemon.length;
-      });
-
-    this.pokemonService.loading$
-      .pipe(takeUntil(this.destroy$))
-      .subscribe(loading => {
-        this.loading = loading;
-      });
-
-    this.pokemonService.error$
-      .pipe(takeUntil(this.destroy$))
-      .subscribe(error => {
-        this.error = error;
-      });
-
     // Load initial Pokemon
-    this.pokemonService.loadPokemon().subscribe();
+    this.pokemonService.loadInitialPokemon().subscribe();
   }
 
   ngAfterViewInit(): void {
-    // ตั้งค่า Intersection Observer สำหรับการโหลดข้อมูลแบบ lazy loading
+    // Set up intersection observer for infinite scroll
     if (this.loadTrigger) {
-      this.intersectionObserver = new IntersectionObserver(
+      this.observer = new IntersectionObserver(
         (entries) => {
           entries.forEach((entry) => {
-            if (entry.isIntersecting && 
-                !this.loading && 
-                !this.isLoadingMore && 
-                this.pokemonService.hasMorePokemon()) {
-              this.loadMorePokemon();
+            if (
+              entry.isIntersecting &&
+              this.hasMore() &&
+              !this.loading() &&
+              !this.isLoadingMore()
+            ) {
+              this.loadMore();
             }
           });
         },
         {
-          rootMargin: '300px' // โหลดล่วงหน้า 300px
+          // Trigger 1500px before reaching the element (proactive loading)
+          rootMargin: '1500px'
         }
       );
       
-      this.intersectionObserver.observe(this.loadTrigger.nativeElement);
+      this.observer.observe(this.loadTrigger.nativeElement);
     }
   }
 
   ngOnDestroy(): void {
-    this.destroy$.next();
-    this.destroy$.complete();
-    
-    // ทำความสะอาด Intersection Observer
-    if (this.intersectionObserver) {
-      this.intersectionObserver.disconnect();
+    if (this.observer) {
+      this.observer.disconnect();
     }
   }
 
-  @HostListener('window:scroll', ['$event'])
-  onScroll(event: any): void {
-    const scrollPosition = window.pageYOffset;
-    const documentHeight = document.documentElement.scrollHeight;
-    const windowHeight = window.innerHeight;
-    const distanceFromBottom = documentHeight - (scrollPosition + windowHeight);
-    
-    // แสดง skeleton เมื่อใกล้ threshold (สำหรับ UX ที่ดีขึ้น)
-    this.isNearBottom = distanceFromBottom <= this.preloadThreshold;
-    this.showSkeletons = this.isNearBottom && this.hasMorePokemon && !this.isLoadingMore;
-    
-    // Fallback loading หากไม่มี Intersection Observer
-    if (distanceFromBottom <= 200 && 
-        !this.loading && 
-        !this.isLoadingMore && 
-        this.hasMorePokemon) {
-      this.loadMorePokemon();
-    }
-  }
-
-  private loadMorePokemon(): void {
-    this.isLoadingMore = true;
-    
-    this.pokemonService.loadMorePokemon()
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: () => {
-          this.isLoadingMore = false;
-          // ซ่อน skeleton หลังจากโหลดเสร็จ
-          setTimeout(() => {
-            this.showSkeletons = false;
-          }, 200);
-        },
-        error: () => {
-          this.isLoadingMore = false;
-          this.showSkeletons = false;
-        }
-      });
-  }
-
-  trackByPokemon(index: number, pokemon: Pokemon): number {
+  /**
+   * Track Pokemon by ID for performance
+   */
+  trackByPokemonId(index: number, pokemon: Pokemon): number {
     return pokemon.id;
   }
 
-  getDisplayIndex(index: number): number {
-    // Reset animation index every 12 items สำหรับ staggered animation
-    return index % 12;
+  /**
+   * Check if this is one of the first 10 items (for priority loading)
+   */
+  isPriorityItem(index: number): boolean {
+    return index < 10;
   }
 
-  isRecentlyLoaded(index: number): boolean {
-    // Cards ที่โหลดใหม่จะแสดงเร็วขึ้น โดยเปรียบเทียบกับ lastKnownCount
-    const initialLoadCount = 24; // จำนวน cards ที่โหลดครั้งแรก
-    return index >= Math.max(initialLoadCount, this.lastKnownCount - 24);
-  }
-
-  get isUsingMockData(): boolean {
-    return this.pokemonService.isUsingMockData();
-  }
-
-  get hasMorePokemon(): boolean {
-    return this.pokemonService.hasMorePokemon();
-  }
-
-  onFilterChange(filter: PokemonFilterData): void {
-    this.activeFilter = filter;
-    
-    // If generation filter is changed and not 'all', preload that generation's Pokemon
-    if (filter.generation !== 'all') {
-      const [minId, maxId] = GENERATION_RANGES[filter.generation];
-      
-      // Load Pokemon for this generation if not already loaded
-      this.pokemonService.loadPokemonForGeneration(minId, maxId)
-        .pipe(takeUntil(this.destroy$))
-        .subscribe(() => {
-          this.applyFilters();
-        });
-    } else {
-      this.applyFilters();
-    }
-  }
-
-  applyFilters(): void {
-    let result = [...this.pokemon];
-
-    // Filter by keyword (name or id)
-    if (this.activeFilter.keyword) {
-      const keyword = this.activeFilter.keyword.toLowerCase();
-      result = result.filter(p => 
-        p.name.toLowerCase().includes(keyword) || 
-        p.id.toString().includes(keyword)
-      );
-    }
-
-    // Filter by types
-    if (this.activeFilter.types.length > 0) {
-      result = result.filter(p => 
-        p.types?.some(t => this.activeFilter.types.includes(t.type.name))
-      );
-    }
-
-    // Filter by generation (based on pokemon ID ranges)
-    if (this.activeFilter.generation !== 'all') {
-      const [min, max] = GENERATION_RANGES[this.activeFilter.generation] || [1, 1008];
-      result = result.filter(p => p.id >= min && p.id <= max);
-    }
-
-    this.filteredPokemon = result;
-  }
-
-  onPokemonClick(pokemonId: number): void {
-    this.selectedPokemonId = pokemonId;
-  }
-
-  onCloseDetail(): void {
-    this.selectedPokemonId = null;
-  }
-
-  toggleSidebar(): void {
-    this.isSidebarOpen = !this.isSidebarOpen;
-  }
-
-  closeSidebar(): void {
-    this.isSidebarOpen = false;
+  /**
+   * Load more Pokemon
+   */
+  private loadMore(): void {
+    this.isLoadingMore.set(true);
+    this.pokemonService.loadMore().subscribe({
+      next: () => {
+        this.isLoadingMore.set(false);
+      },
+      error: () => {
+        this.isLoadingMore.set(false);
+      }
+    });
   }
 }

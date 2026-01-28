@@ -1,8 +1,9 @@
-import { Injectable } from '@angular/core';
+import { Injectable, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { Observable, BehaviorSubject, forkJoin, of, timer } from 'rxjs';
-import { map, switchMap, catchError, delay } from 'rxjs/operators';
-import { Pokemon, PokemonListResponse, PokemonDetails, PokemonSpecies, EvolutionChain } from '../models/pokemon.model';
+import { map, switchMap, catchError, tap } from 'rxjs/operators';
+import { Pokemon, PokemonListResponse, PokemonDetails } from '../models/pokemon.model';
 import { generateMockPokemon } from '../models/mock-data';
 
 @Injectable({
@@ -10,225 +11,225 @@ import { generateMockPokemon } from '../models/mock-data';
 })
 export class PokemonService {
   private readonly API_URL = 'https://pokeapi.co/api/v2';
-  private pokemonSubject = new BehaviorSubject<Pokemon[]>([]);
-  private loadingSubject = new BehaviorSubject<boolean>(false);
-  private errorSubject = new BehaviorSubject<string | null>(null);
-  private totalCount = 1008; // Total Pokemon count
-  private currentOffset = 0;
-  private readonly limit = 24; // เพิ่มจำนวนโหลดต่อครั้งจาก 20 เป็น 24
-  private useMockData = false;
+  private readonly LIMIT = 20; // Items per page
+  private readonly PREFETCH_PAGES = 2; // Prefetch 2 pages ahead
 
-  pokemon$ = this.pokemonSubject.asObservable();
-  loading$ = this.loadingSubject.asObservable();
-  error$ = this.errorSubject.asObservable();
+  // Signals for state management
+  private pokemonListSignal = signal<Pokemon[]>([]);
+  private loadingSignal = signal<boolean>(false);
+  private currentPageSignal = signal<number>(0);
+  private totalCountSignal = signal<number>(1025); // Total Pokemon
+
+  // Public computed signals
+  readonly pokemonList = this.pokemonListSignal.asReadonly();
+  readonly loading = this.loadingSignal.asReadonly();
+  readonly currentPage = this.currentPageSignal.asReadonly();
+  readonly hasMore = computed(() => 
+    this.pokemonListSignal().length < this.totalCountSignal()
+  );
+
+  // Cache for prefetched data
+  private prefetchCache = new Map<number, Pokemon[]>();
+  private prefetchingPages = new Set<number>();
+  private useMockData = false; // Flag to use mock data if API fails
 
   constructor(private http: HttpClient) {}
 
-  loadPokemon(offset: number = 0): Observable<Pokemon[]> {
-    this.loadingSubject.next(true);
-    this.errorSubject.next(null);
-    
-    // If we're already using mock data or if this is a retry, use mock data
-    if (this.useMockData) {
-      return this.loadMockPokemon(offset);
-    }
-    
-    return this.http.get<PokemonListResponse>(`${this.API_URL}/pokemon?limit=${this.limit}&offset=${offset}`)
-      .pipe(
-        switchMap(response => {
-          this.totalCount = response.count;
-          
-          // Get detailed information for each Pokemon
-          const detailRequests = response.results.map(pokemon => {
-            const id = this.extractIdFromUrl(pokemon.url);
-            return this.getPokemonDetails(id).pipe(
-              map(details => ({
-                ...pokemon,
-                id: details.id,
-                imageUrl: details.sprites.other['official-artwork'].front_default || 
-                         details.sprites.other.dream_world.front_default ||
-                         details.sprites.front_default,
-                sprites: details.sprites,
-                types: details.types,
-                height: details.height,
-                weight: details.weight
-              })),
-              catchError(() => of({
-                ...pokemon,
-                id: id,
-                imageUrl: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`
-              }))
-            );
-          });
-          
-          return forkJoin(detailRequests);
-        }),
-        map(pokemonWithDetails => {
-          const currentPokemon = this.pokemonSubject.value;
-          const updatedPokemon = offset === 0 ? pokemonWithDetails : [...currentPokemon, ...pokemonWithDetails];
-          this.pokemonSubject.next(updatedPokemon);
-          this.currentOffset = offset + this.limit;
-          this.loadingSubject.next(false);
-          return updatedPokemon;
-        }),
-        catchError(error => {
-          console.warn('API request failed, switching to mock data:', error);
-          this.useMockData = true;
-          this.errorSubject.next('Using demo data - API unavailable');
-          return this.loadMockPokemon(offset);
-        })
-      );
-  }
-
-  private loadMockPokemon(offset: number): Observable<Pokemon[]> {
-    // ลด delay จาก 300ms เป็น 150ms เพื่อให้โหลดเร็วขึ้นมากกว่าเดิม
-    return timer(150).pipe(
-      map(() => {
-        const mockPokemon = generateMockPokemon(offset, this.limit);
-        const currentPokemon = this.pokemonSubject.value;
-        const updatedPokemon = offset === 0 ? mockPokemon : [...currentPokemon, ...mockPokemon];
-        this.pokemonSubject.next(updatedPokemon);
-        this.currentOffset = offset + this.limit;
-        this.loadingSubject.next(false);
-        return updatedPokemon;
+  /**
+   * Load initial Pokemon
+   */
+  loadInitialPokemon(): Observable<Pokemon[]> {
+    this.loadingSignal.set(true);
+    return this.loadPage(0).pipe(
+      tap(() => {
+        // Start prefetching next pages
+        this.prefetchNextPages(1);
       })
     );
   }
 
-  loadMorePokemon(): Observable<Pokemon[]> {
-    return this.loadPokemon(this.currentOffset);
+  /**
+   * Load more Pokemon (triggered by scrolling)
+   */
+  loadMore(): Observable<Pokemon[]> {
+    const nextPage = this.currentPageSignal() + 1;
+    
+    // Check if already in cache
+    if (this.prefetchCache.has(nextPage)) {
+      const cachedData = this.prefetchCache.get(nextPage)!;
+      this.appendPokemon(cachedData);
+      this.currentPageSignal.set(nextPage);
+      this.prefetchCache.delete(nextPage);
+      
+      // Prefetch further ahead
+      this.prefetchNextPages(nextPage + 1);
+      
+      return of(this.pokemonListSignal());
+    }
+
+    // Load from API if not cached
+    this.loadingSignal.set(true);
+    return this.loadPage(nextPage).pipe(
+      tap(() => {
+        this.prefetchNextPages(nextPage + 1);
+      })
+    );
   }
 
-  getPokemonDetails(id: number): Observable<PokemonDetails> {
+  /**
+   * Prefetch next 2-3 pages ahead
+   */
+  private prefetchNextPages(startPage: number): void {
+    for (let i = 0; i < this.PREFETCH_PAGES; i++) {
+      const pageToFetch = startPage + i;
+      const offset = pageToFetch * this.LIMIT;
+      
+      // Don't prefetch if already loading, cached, or beyond total count
+      if (
+        this.prefetchingPages.has(pageToFetch) ||
+        this.prefetchCache.has(pageToFetch) ||
+        offset >= this.totalCountSignal()
+      ) {
+        continue;
+      }
+
+      this.prefetchingPages.add(pageToFetch);
+      
+      this.loadPokemonData(offset).subscribe({
+        next: (pokemon) => {
+          this.prefetchCache.set(pageToFetch, pokemon);
+          this.prefetchingPages.delete(pageToFetch);
+        },
+        error: () => {
+          this.prefetchingPages.delete(pageToFetch);
+        }
+      });
+    }
+  }
+
+  /**
+   * Load a specific page
+   */
+  private loadPage(page: number): Observable<Pokemon[]> {
+    const offset = page * this.LIMIT;
+    
+    return this.loadPokemonData(offset).pipe(
+      tap((pokemon) => {
+        if (page === 0) {
+          this.pokemonListSignal.set(pokemon);
+        } else {
+          this.appendPokemon(pokemon);
+        }
+        this.currentPageSignal.set(page);
+        this.loadingSignal.set(false);
+      })
+    );
+  }
+
+  /**
+   * Load Pokemon data from API
+   */
+  private loadPokemonData(offset: number): Observable<Pokemon[]> {
+    // If we're using mock data, skip API call
+    if (this.useMockData) {
+      return this.loadMockData(offset);
+    }
+
+    return this.http.get<PokemonListResponse>(
+      `${this.API_URL}/pokemon?limit=${this.LIMIT}&offset=${offset}`
+    ).pipe(
+      tap(response => this.totalCountSignal.set(response.count)),
+      switchMap(response => {
+        const detailRequests = response.results.map(pokemon => {
+          const id = this.extractIdFromUrl(pokemon.url);
+          return this.getPokemonDetails(id).pipe(
+            map(details => this.mapToPokemon(pokemon, details)),
+            catchError(() => of(this.createFallbackPokemon(pokemon, id)))
+          );
+        });
+        return forkJoin(detailRequests);
+      }),
+      catchError(error => {
+        console.error('Failed to load Pokemon, switching to mock data:', error);
+        this.useMockData = true;
+        return this.loadMockData(offset);
+      })
+    );
+  }
+
+  /**
+   * Load mock data as fallback
+   */
+  private loadMockData(offset: number): Observable<Pokemon[]> {
+    return timer(150).pipe(
+      map(() => generateMockPokemon(offset, this.LIMIT))
+    );
+  }
+
+  /**
+   * Get detailed Pokemon information
+   */
+  private getPokemonDetails(id: number): Observable<PokemonDetails> {
     return this.http.get<PokemonDetails>(`${this.API_URL}/pokemon/${id}`);
   }
 
-  getPokemonSpecies(id: number): Observable<PokemonSpecies> {
-    return this.http.get<PokemonSpecies>(`${this.API_URL}/pokemon-species/${id}`);
+  /**
+   * Map API response to Pokemon model with 3D home sprite
+   */
+  private mapToPokemon(basicInfo: Pokemon, details: PokemonDetails): Pokemon {
+    // Priority: home sprite (3D) > official artwork > dream world > front default
+    const imageUrl = 
+      details.sprites.other?.home?.front_default ||
+      details.sprites.other?.['official-artwork']?.front_default ||
+      details.sprites.other?.dream_world?.front_default ||
+      details.sprites.front_default ||
+      `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/${details.id}.png`;
+
+    return {
+      ...basicInfo,
+      id: details.id,
+      imageUrl,
+      sprites: details.sprites,
+      types: details.types,
+      height: details.height,
+      weight: details.weight
+    };
   }
 
-  getEvolutionChain(url: string): Observable<EvolutionChain> {
-    return this.http.get<EvolutionChain>(url);
+  /**
+   * Create fallback Pokemon object
+   */
+  private createFallbackPokemon(basicInfo: Pokemon, id: number): Pokemon {
+    return {
+      ...basicInfo,
+      id,
+      imageUrl: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/${id}.png`
+    };
   }
 
-  hasMorePokemon(): boolean {
-    return this.currentOffset < this.totalCount;
+  /**
+   * Append Pokemon to the list
+   */
+  private appendPokemon(newPokemon: Pokemon[]): void {
+    this.pokemonListSignal.update(current => [...current, ...newPokemon]);
   }
 
-  loadPokemonForGeneration(minId: number, maxId: number): Observable<Pokemon[]> {
-    // Check if we already have Pokemon in this range
-    const currentPokemon = this.pokemonSubject.value;
-    const hasDataInRange = currentPokemon.some(p => p.id >= minId && p.id <= maxId);
-    
-    if (hasDataInRange) {
-      // Already have some data in this range, return current state
-      return of(currentPokemon);
-    }
-    
-    // Load Pokemon starting from minId
-    const offset = minId - 1;
-    const limit = Math.min(50, maxId - minId + 1); // Load up to 50 Pokemon from the generation
-    
-    this.loadingSubject.next(true);
-    
-    if (this.useMockData) {
-      return timer(150).pipe(
-        map(() => {
-          const newPokemon = generateMockPokemon(offset, limit);
-          const currentPokemon = this.pokemonSubject.value;
-          
-          // Merge new Pokemon with existing ones, avoiding duplicates
-          const pokemonMap = new Map(currentPokemon.map(p => [p.id, p]));
-          newPokemon.forEach(p => pokemonMap.set(p.id, p));
-          
-          const updatedPokemon = Array.from(pokemonMap.values()).sort((a, b) => a.id - b.id);
-          this.pokemonSubject.next(updatedPokemon);
-          this.loadingSubject.next(false);
-          return updatedPokemon;
-        })
-      );
-    }
-    
-    // Try to load from API
-    return this.http.get<PokemonListResponse>(`${this.API_URL}/pokemon?limit=${limit}&offset=${offset}`)
-      .pipe(
-        switchMap(response => {
-          const detailRequests = response.results.map(pokemon => {
-            const id = this.extractIdFromUrl(pokemon.url);
-            return this.getPokemonDetails(id).pipe(
-              map(details => ({
-                ...pokemon,
-                id: details.id,
-                imageUrl: details.sprites.other['official-artwork'].front_default || 
-                         details.sprites.other.dream_world.front_default ||
-                         details.sprites.front_default,
-                sprites: details.sprites,
-                types: details.types,
-                height: details.height,
-                weight: details.weight
-              })),
-              catchError(() => of({
-                ...pokemon,
-                id: id,
-                imageUrl: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`
-              }))
-            );
-          });
-          
-          return forkJoin(detailRequests);
-        }),
-        map(newPokemon => {
-          const currentPokemon = this.pokemonSubject.value;
-          
-          // Merge new Pokemon with existing ones, avoiding duplicates
-          const pokemonMap = new Map(currentPokemon.map(p => [p.id, p]));
-          newPokemon.forEach(p => pokemonMap.set(p.id, p));
-          
-          const updatedPokemon = Array.from(pokemonMap.values()).sort((a, b) => a.id - b.id);
-          this.pokemonSubject.next(updatedPokemon);
-          this.loadingSubject.next(false);
-          return updatedPokemon;
-        }),
-        catchError(error => {
-          console.warn('API request failed for generation, switching to mock data:', error);
-          this.useMockData = true;
-          
-          // Use mock data directly instead of recursive call
-          return timer(150).pipe(
-            map(() => {
-              const newPokemon = generateMockPokemon(offset, limit);
-              const currentPokemon = this.pokemonSubject.value;
-              
-              // Merge new Pokemon with existing ones, avoiding duplicates
-              const pokemonMap = new Map(currentPokemon.map(p => [p.id, p]));
-              newPokemon.forEach(p => pokemonMap.set(p.id, p));
-              
-              const updatedPokemon = Array.from(pokemonMap.values()).sort((a, b) => a.id - b.id);
-              this.pokemonSubject.next(updatedPokemon);
-              this.loadingSubject.next(false);
-              return updatedPokemon;
-            })
-          );
-        })
-      );
-  }
-
+  /**
+   * Extract Pokemon ID from URL
+   */
   private extractIdFromUrl(url: string): number {
     const matches = url.match(/\/(\d+)\/$/);
     return matches ? parseInt(matches[1], 10) : 0;
   }
 
-  getCurrentPokemonCount(): number {
-    return this.pokemonSubject.value.length;
-  }
-
+  /**
+   * Reset service state
+   */
   reset(): void {
-    this.pokemonSubject.next([]);
-    this.currentOffset = 0;
-    this.errorSubject.next(null);
-  }
-
-  isUsingMockData(): boolean {
-    return this.useMockData;
+    this.pokemonListSignal.set([]);
+    this.currentPageSignal.set(0);
+    this.loadingSignal.set(false);
+    this.prefetchCache.clear();
+    this.prefetchingPages.clear();
   }
 }
