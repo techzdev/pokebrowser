@@ -42,7 +42,7 @@ export class PokemonGrid implements OnInit, OnDestroy {
   // Constants for positioning (grid layout)
   private readonly CARD_SPACING = 350;
   private readonly COLUMNS = 6;
-  private readonly MAX_POKEMON = 500;
+  private readonly INITIAL_LOAD_COUNT = 150; // Load fewer initially for faster startup
   
   // Tile offsets for seamless infinite scrolling (3x3 grid of tiles)
   tileOffsets: { x: number, y: number }[] = [];
@@ -73,8 +73,8 @@ export class PokemonGrid implements OnInit, OnDestroy {
         this.error = error;
       });
 
-    // Load all Pokemon at once for infinite canvas view
-    this.loadAllPokemon();
+    // Load Pokemon optimized for infinite scroll
+    this.loadInitialPokemon();
   }
   
   private updateTileOffsets(): void {
@@ -100,21 +100,32 @@ export class PokemonGrid implements OnInit, OnDestroy {
     }
   }
 
-  private loadAllPokemon(): void {
-    // Load pokemon in batches until we have enough
+  private loadInitialPokemon(): void {
+    // Load initial batch of Pokemon for faster startup
+    // Since we have infinite tiling, we only need enough to fill 1 tile
+    // The 3x3 tiling will repeat this content seamlessly
+    this.pokemonService.loadPokemon(0).subscribe(() => {
+      // Continue loading in background to reach INITIAL_LOAD_COUNT
+      this.loadMoreInBackground();
+    });
+  }
+  
+  private loadMoreInBackground(): void {
+    // Load more Pokemon in background without blocking UI
     const loadBatch = () => {
-      if (this.pokemonService.hasMorePokemon() && this.pokemon.length < this.MAX_POKEMON) {
+      if (this.pokemonService.hasMorePokemon() && 
+          this.pokemon.length < this.INITIAL_LOAD_COUNT) {
         this.pokemonService.loadMorePokemon()
           .pipe(takeUntil(this.destroy$))
           .subscribe(() => {
-            this.loadingTimeoutId = window.setTimeout(() => loadBatch(), 100);
+            // Use longer delay to not overwhelm the system
+            this.loadingTimeoutId = window.setTimeout(() => loadBatch(), 200);
           });
       }
     };
     
-    this.pokemonService.loadPokemon().subscribe(() => {
-      loadBatch();
-    });
+    // Start background loading after a short delay
+    this.loadingTimeoutId = window.setTimeout(() => loadBatch(), 300);
   }
 
   ngOnDestroy(): void {
