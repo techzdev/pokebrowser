@@ -75,6 +75,7 @@ export class InfiniteCanvas implements OnInit, OnDestroy {
   private isPanning = false;
   private lastTouchX = 0;
   private lastTouchY = 0;
+  private boundHandleWheel: (event: WheelEvent) => void;
 
   // Expose signals to template
   currentOffsetX = computed(() => this.offsetX());
@@ -84,21 +85,23 @@ export class InfiniteCanvas implements OnInit, OnDestroy {
 
   constructor(private http: HttpClient, private elementRef: ElementRef) {
     // Track position changes for reactive updates
+    // Bind the wheel handler once in constructor to ensure same reference for add/remove
+    this.boundHandleWheel = this.handleWheel.bind(this);
   }
 
   ngOnInit(): void {
     this.loadPokemon();
     
     // Add wheel event listener with passive: false to allow preventDefault()
-    this.elementRef.nativeElement.addEventListener('wheel', this.handleWheel.bind(this), { passive: false });
+    this.elementRef.nativeElement.addEventListener('wheel', this.boundHandleWheel, { passive: false });
   }
 
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
     
-    // Remove wheel event listener
-    this.elementRef.nativeElement.removeEventListener('wheel', this.handleWheel.bind(this));
+    // Remove wheel event listener using the same bound reference
+    this.elementRef.nativeElement.removeEventListener('wheel', this.boundHandleWheel);
   }
 
   private loadPokemon(): void {
