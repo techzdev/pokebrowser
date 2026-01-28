@@ -1,6 +1,5 @@
-import { Component, OnInit, OnDestroy, HostListener, ElementRef, ViewChild } from '@angular/core';
+import { Component, OnInit, OnDestroy, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ScrollingModule } from '@angular/cdk/scrolling';
 import { Subject, takeUntil } from 'rxjs';
 import { PokemonService } from '../../services/pokemon.service';
 import { PokemonCard } from '../pokemon-card/pokemon-card';
@@ -11,13 +10,11 @@ import { GENERATION_RANGES } from '../../utils/pokemon-type-utils';
 
 @Component({
   selector: 'app-pokemon-grid',
-  imports: [CommonModule, ScrollingModule, PokemonCard, PokemonFilter, PokemonDetail],
+  imports: [CommonModule, PokemonCard, PokemonFilter, PokemonDetail],
   templateUrl: './pokemon-grid.html',
   styleUrl: './pokemon-grid.scss'
 })
 export class PokemonGrid implements OnInit, OnDestroy {
-  @ViewChild('canvas', { static: false }) canvas?: ElementRef;
-  
   pokemon: Pokemon[] = [];
   filteredPokemon: Pokemon[] = [];
   loading = false;
@@ -34,6 +31,18 @@ export class PokemonGrid implements OnInit, OnDestroy {
   private lastMouseX = 0;
   private lastMouseY = 0;
   private destroy$ = new Subject<void>();
+  private loadingTimeoutId?: number;
+  
+  // Constants for zoom and positioning
+  private readonly MIN_ZOOM = 0.3;
+  private readonly MAX_ZOOM = 3;
+  private readonly ZOOM_STEP = 0.2;
+  private readonly ZOOM_SENSITIVITY = 0.001;
+  private readonly CARD_SPACING = 350;
+  private readonly COLUMNS = 8;
+  private readonly STAGGER_OFFSET = 100;
+  private readonly ALTERNATE_OFFSET = 50;
+  private readonly MAX_POKEMON = 500;
 
   constructor(private pokemonService: PokemonService) {}
 
@@ -65,11 +74,11 @@ export class PokemonGrid implements OnInit, OnDestroy {
   private loadAllPokemon(): void {
     // Load pokemon in batches until we have enough
     const loadBatch = () => {
-      if (this.pokemonService.hasMorePokemon() && this.pokemon.length < 500) {
+      if (this.pokemonService.hasMorePokemon() && this.pokemon.length < this.MAX_POKEMON) {
         this.pokemonService.loadMorePokemon()
           .pipe(takeUntil(this.destroy$))
           .subscribe(() => {
-            setTimeout(() => loadBatch(), 100);
+            this.loadingTimeoutId = window.setTimeout(() => loadBatch(), 100);
           });
       }
     };
@@ -80,6 +89,11 @@ export class PokemonGrid implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    // Clear any pending timeout to prevent memory leaks
+    if (this.loadingTimeoutId) {
+      clearTimeout(this.loadingTimeoutId);
+    }
+    
     this.destroy$.next();
     this.destroy$.complete();
   }
@@ -119,20 +133,23 @@ export class PokemonGrid implements OnInit, OnDestroy {
     // Check if it's a pinch-to-zoom gesture (ctrlKey is set for trackpad pinch)
     if (event.ctrlKey) {
       // Zoom
-      const zoomDelta = -event.deltaY * 0.001;
-      const newZoom = Math.max(0.3, Math.min(3, this.zoom + zoomDelta));
+      const zoomDelta = -event.deltaY * this.ZOOM_SENSITIVITY;
+      const newZoom = Math.max(this.MIN_ZOOM, Math.min(this.MAX_ZOOM, this.zoom + zoomDelta));
       
       // Zoom towards cursor position
-      const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-      const x = event.clientX - rect.left;
-      const y = event.clientY - rect.top;
-      
-      const dx = x - rect.width / 2;
-      const dy = y - rect.height / 2;
-      
-      this.panX += dx * (1 - newZoom / this.zoom);
-      this.panY += dy * (1 - newZoom / this.zoom);
-      this.zoom = newZoom;
+      const target = event.currentTarget as HTMLElement;
+      if (target) {
+        const rect = target.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+        
+        const dx = x - rect.width / 2;
+        const dy = y - rect.height / 2;
+        
+        this.panX += dx * (1 - newZoom / this.zoom);
+        this.panY += dy * (1 - newZoom / this.zoom);
+        this.zoom = newZoom;
+      }
     } else {
       // Pan with trackpad (2-finger scroll)
       this.panX -= event.deltaX;
@@ -145,11 +162,11 @@ export class PokemonGrid implements OnInit, OnDestroy {
   }
 
   zoomIn(): void {
-    this.zoom = Math.min(3, this.zoom + 0.2);
+    this.zoom = Math.min(this.MAX_ZOOM, this.zoom + this.ZOOM_STEP);
   }
 
   zoomOut(): void {
-    this.zoom = Math.max(0.3, this.zoom - 0.2);
+    this.zoom = Math.max(this.MIN_ZOOM, this.zoom - this.ZOOM_STEP);
   }
 
   resetZoom(): void {
@@ -161,19 +178,19 @@ export class PokemonGrid implements OnInit, OnDestroy {
   // Position Pokemon at specific coordinates
   getPokemonX(index: number): number {
     // Create a non-linear layout pattern
-    const col = index % 8;
-    const row = Math.floor(index / 8);
-    const baseX = col * 350;
-    const offsetX = (row % 3) * 100; // Stagger every 3 rows
-    return baseX + offsetX + 50;
+    const col = index % this.COLUMNS;
+    const row = Math.floor(index / this.COLUMNS);
+    const baseX = col * this.CARD_SPACING;
+    const offsetX = (row % 3) * this.STAGGER_OFFSET; // Stagger every 3 rows
+    return baseX + offsetX + this.ALTERNATE_OFFSET;
   }
 
   getPokemonY(index: number): number {
-    const row = Math.floor(index / 8);
-    const baseY = row * 350;
-    const col = index % 8;
-    const offsetY = (col % 2) * 50; // Alternate columns
-    return baseY + offsetY + 50;
+    const row = Math.floor(index / this.COLUMNS);
+    const baseY = row * this.CARD_SPACING;
+    const col = index % this.COLUMNS;
+    const offsetY = (col % 2) * this.ALTERNATE_OFFSET; // Alternate columns
+    return baseY + offsetY + this.ALTERNATE_OFFSET;
   }
 
   trackByPokemon(index: number, pokemon: Pokemon): number {
@@ -181,7 +198,7 @@ export class PokemonGrid implements OnInit, OnDestroy {
   }
 
   getDisplayIndex(index: number): number {
-    // Reset animation index every 12 items สำหรับ staggered animation
+    // Reset animation index every 12 items for staggered animation
     return index % 12;
   }
 
