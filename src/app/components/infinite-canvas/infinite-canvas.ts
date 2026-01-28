@@ -5,7 +5,8 @@ import {
   HostListener, 
   signal,
   computed,
-  effect
+  effect,
+  ElementRef
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
@@ -81,17 +82,23 @@ export class InfiniteCanvas implements OnInit, OnDestroy {
   loading = computed(() => this.isLoading());
   error = computed(() => this.errorMessage());
 
-  constructor(private http: HttpClient) {
+  constructor(private http: HttpClient, private elementRef: ElementRef) {
     // Track position changes for reactive updates
   }
 
   ngOnInit(): void {
     this.loadPokemon();
+    
+    // Add wheel event listener with passive: false to allow preventDefault()
+    this.elementRef.nativeElement.addEventListener('wheel', this.handleWheel.bind(this), { passive: false });
   }
 
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+    
+    // Remove wheel event listener
+    this.elementRef.nativeElement.removeEventListener('wheel', this.handleWheel.bind(this));
   }
 
   private loadPokemon(): void {
@@ -138,8 +145,15 @@ export class InfiniteCanvas implements OnInit, OnDestroy {
     this.allPokemon.set(mockPokemon);
   }
 
-  @HostListener('wheel', ['$event'])
-  onWheel(event: WheelEvent): void {
+  @HostListener('mousedown', ['$event'])
+  onMouseDown(event: MouseEvent): void {
+    this.isPanning = true;
+    this.lastTouchX = event.clientX;
+    this.lastTouchY = event.clientY;
+    event.preventDefault();
+  }
+
+  private handleWheel(event: WheelEvent): void {
     event.preventDefault();
     
     // Get delta values from wheel event
@@ -149,14 +163,6 @@ export class InfiniteCanvas implements OnInit, OnDestroy {
     // Update offset with inverted values for natural scrolling
     this.offsetX.update(x => x - deltaX);
     this.offsetY.update(y => y - deltaY);
-  }
-
-  @HostListener('mousedown', ['$event'])
-  onMouseDown(event: MouseEvent): void {
-    this.isPanning = true;
-    this.lastTouchX = event.clientX;
-    this.lastTouchY = event.clientY;
-    event.preventDefault();
   }
 
   @HostListener('mousemove', ['$event'])
