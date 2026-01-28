@@ -6,6 +6,18 @@ import { Pokemon } from './pokemon.model';
 export function generateMockPokemon(offset: number, limit: number): Pokemon[] {
   const mockPokemon: Pokemon[] = [];
   
+  // Common type combinations
+  const typeOptions = [
+    [{ slot: 1, type: { name: 'grass', url: '' } }],
+    [{ slot: 1, type: { name: 'fire', url: '' } }],
+    [{ slot: 1, type: { name: 'water', url: '' } }],
+    [{ slot: 1, type: { name: 'electric', url: '' } }],
+    [{ slot: 1, type: { name: 'normal', url: '' } }],
+    [{ slot: 1, type: { name: 'bug', url: '' } }, { slot: 2, type: { name: 'poison', url: '' } }],
+    [{ slot: 1, type: { name: 'flying', url: '' } }],
+    [{ slot: 1, type: { name: 'psychic', url: '' } }],
+  ];
+  
   for (let i = 0; i < limit; i++) {
     const id = offset + i + 1;
     if (id > 1025) break; // Max Pokemon
@@ -29,7 +41,10 @@ export function generateMockPokemon(offset: number, limit: number): Pokemon[] {
             front_default: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/${id}.png`
           }
         }
-      }
+      },
+      types: typeOptions[id % typeOptions.length],
+      height: 10 + (id % 20),
+      weight: 60 + (id % 100)
     });
   }
   

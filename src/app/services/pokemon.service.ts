@@ -161,7 +161,7 @@ export class PokemonService {
    * Load mock data as fallback
    */
   private loadMockData(offset: number): Observable<Pokemon[]> {
-    return timer(300).pipe(
+    return timer(150).pipe(
       map(() => generateMockPokemon(offset, this.LIMIT))
     );
   }

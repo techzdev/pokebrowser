@@ -1,15 +1,16 @@
 <div class="card">
   <div class="card-image">
     <img 
-      [ngSrc]="pokemon.imageUrl || 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/' + pokemon.id + '.png'"
+      [ngSrc]="getImageUrl()"
       [alt]="pokemon.name"
       [priority]="isPriority"
+      (error)="onImageError()"
       width="220"
       height="220"
     />
   </div>
   <div class="card-info">
-    <span class="card-id">#{{ pokemon.id.toString().padStart(4, '0') }}</span>
+    <span class="card-id">#{{ pokemon.id.toString().padStart(3, '0') }}</span>
     <h3 class="card-name">{{ pokemon.name }}</h3>
   </div>
 </div>

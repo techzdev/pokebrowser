@@ -9,21 +9,16 @@
       <p>Loading Pokémon...</p>
     </div>
   } @else {
-    <cdk-virtual-scroll-viewport 
-      [itemSize]="280" 
-      [minBufferPx]="1500"
-      [maxBufferPx]="3000"
-      class="viewport"
-      (scrolledIndexChange)="onScrollIndexChange($event)">
-      
-      <div class="grid">
-        @for (pokemon of pokemonList(); track trackByPokemonId($index, pokemon)) {
-          <app-pokemon-card 
-            [pokemon]="pokemon"
-            [isPriority]="isPriorityItem($index)"
-          />
-        }
-      </div>
-    </cdk-virtual-scroll-viewport>
+    <div class="grid">
+      @for (pokemon of pokemonList(); track trackByPokemonId($index, pokemon)) {
+        <app-pokemon-card 
+          [pokemon]="pokemon"
+          [isPriority]="isPriorityItem($index)"
+        />
+      }
+    </div>
+    
+    <!-- Load trigger for infinite scroll -->
+    <div class="load-trigger" #loadTrigger></div>
   }
 </div>
