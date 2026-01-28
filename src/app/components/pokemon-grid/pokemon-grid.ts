@@ -23,7 +23,7 @@ export class PokemonGrid implements OnInit, OnDestroy {
   activeFilter: PokemonFilterData = { keyword: '', types: [], generation: 'all' };
   isSidebarOpen = false;
   
-  // Pan properties (zoom removed)
+  // Pan properties with momentum
   panX = 0;
   panY = 0;
   isPanning = false;
@@ -31,6 +31,13 @@ export class PokemonGrid implements OnInit, OnDestroy {
   private lastMouseY = 0;
   private destroy$ = new Subject<void>();
   private loadingTimeoutId?: number;
+  
+  // Momentum scrolling properties
+  private velocityX = 0;
+  private velocityY = 0;
+  private momentumAnimation?: number;
+  private readonly FRICTION = 0.92; // Friction coefficient for momentum
+  private readonly MIN_VELOCITY = 0.1; // Minimum velocity before stopping
   
   // Constants for positioning (grid layout)
   private readonly CARD_SPACING = 350;
@@ -116,16 +123,30 @@ export class PokemonGrid implements OnInit, OnDestroy {
       clearTimeout(this.loadingTimeoutId);
     }
     
+    // Clear momentum animation
+    if (this.momentumAnimation) {
+      cancelAnimationFrame(this.momentumAnimation);
+    }
+    
     this.destroy$.next();
     this.destroy$.complete();
   }
 
-  // Pan and Zoom Methods
+  // Pan and Mouse Methods
   onMouseDown(event: MouseEvent): void {
     if (event.button === 0 && !(event.target as HTMLElement).closest('.positioned-card')) {
       this.isPanning = true;
       this.lastMouseX = event.clientX;
       this.lastMouseY = event.clientY;
+      
+      // Stop any existing momentum
+      this.velocityX = 0;
+      this.velocityY = 0;
+      if (this.momentumAnimation) {
+        cancelAnimationFrame(this.momentumAnimation);
+        this.momentumAnimation = undefined;
+      }
+      
       event.preventDefault();
     }
   }
@@ -139,24 +160,73 @@ export class PokemonGrid implements OnInit, OnDestroy {
       this.panX += deltaX;
       this.panY += deltaY;
       
+      // Store velocity for momentum when released (godly.website style)
+      this.velocityX = deltaX * 0.8;
+      this.velocityY = deltaY * 0.8;
+      
       this.lastMouseX = event.clientX;
       this.lastMouseY = event.clientY;
+      
+      // Apply wrapping during drag
+      this.wrapCoordinates();
     }
   }
 
   @HostListener('document:mouseup')
   onMouseUp(): void {
-    this.isPanning = false;
+    if (this.isPanning) {
+      this.isPanning = false;
+      
+      // Start momentum animation on release if there's significant velocity
+      if (Math.abs(this.velocityX) > this.MIN_VELOCITY || 
+          Math.abs(this.velocityY) > this.MIN_VELOCITY) {
+        this.startMomentumScroll();
+      }
+    }
   }
 
   onWheel(event: WheelEvent): void {
     event.preventDefault();
     
-    // Infinite scrolling - pan in any direction
-    this.panX -= event.deltaX;
-    this.panY -= event.deltaY;
+    // Add velocity from wheel input (godly.website style smooth scrolling)
+    this.velocityX += event.deltaX * 0.5;
+    this.velocityY += event.deltaY * 0.5;
     
-    // Seamless wrapping when crossing tile boundaries
+    // Start momentum animation if not already running
+    if (!this.momentumAnimation) {
+      this.startMomentumScroll();
+    }
+  }
+  
+  private startMomentumScroll(): void {
+    const animate = () => {
+      // Apply velocity to position
+      this.panX -= this.velocityX;
+      this.panY -= this.velocityY;
+      
+      // Apply friction (godly.website uses similar momentum decay)
+      this.velocityX *= this.FRICTION;
+      this.velocityY *= this.FRICTION;
+      
+      // Seamless wrapping when crossing tile boundaries
+      this.wrapCoordinates();
+      
+      // Continue animation if velocity is significant
+      if (Math.abs(this.velocityX) > this.MIN_VELOCITY || 
+          Math.abs(this.velocityY) > this.MIN_VELOCITY) {
+        this.momentumAnimation = requestAnimationFrame(animate);
+      } else {
+        // Stop animation when velocity is too low
+        this.velocityX = 0;
+        this.velocityY = 0;
+        this.momentumAnimation = undefined;
+      }
+    };
+    
+    this.momentumAnimation = requestAnimationFrame(animate);
+  }
+  
+  private wrapCoordinates(): void {
     if (this.gridWidth > 0) {
       // Modulo wrapping for truly infinite coordinates
       while (this.panX > this.gridWidth) {
