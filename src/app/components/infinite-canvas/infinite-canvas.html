@@ -38,7 +38,8 @@
     <!-- Pokemon cards with @for and track for stable identity -->
     @for (card of visiblePokemon(); track card.stableKey) {
       <div
-        class="pokemon-card bento-card card-fade-in"
+        class="pokemon-card bento-card"
+        [@cardEnter]
         [style.transform]="getTransform(card)"
         tabindex="0"
         role="button"

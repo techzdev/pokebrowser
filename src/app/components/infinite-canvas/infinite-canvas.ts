@@ -12,6 +12,7 @@ import {
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Subject, takeUntil } from 'rxjs';
+import { trigger, transition, style, animate } from '@angular/animations';
 import { ImagePrefetchService } from '../../services/image-prefetch.service';
 
 interface Pokemon {
@@ -45,7 +46,15 @@ interface PokemonCardData {
   imports: [CommonModule],
   templateUrl: './infinite-canvas.html',
   styleUrl: './infinite-canvas.scss',
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  animations: [
+    trigger('cardEnter', [
+      transition(':enter', [
+        style({ opacity: 0, transform: 'scale(0.95)' }),
+        animate('300ms ease-out', style({ opacity: 1, transform: 'scale(1)' }))
+      ])
+    ])
+  ]
 })
 export class InfiniteCanvas implements OnInit, OnDestroy {
   // Signals for state management
@@ -60,6 +69,9 @@ export class InfiniteCanvas implements OnInit, OnDestroy {
     const pokemon = this.allPokemon();
     const x = this.offsetX();
     const y = this.offsetY();
+    // Include buffer center in dependencies to trigger updates
+    const bufferX = this.bufferCenterX();
+    const bufferY = this.bufferCenterY();
     
     if (pokemon.length === 0) return [];
     
@@ -79,6 +91,7 @@ export class InfiniteCanvas implements OnInit, OnDestroy {
   // Buffer configuration for seamless loading
   private readonly BUFFER_MULTIPLIER = 2; // Render area 2x larger than viewport
   private readonly UPDATE_THRESHOLD = 200; // Update when moved 200px from buffer center
+  private readonly PREFETCH_BATCH_SIZE = 20; // Number of images to pre-fetch at once
   
   private destroy$ = new Subject<void>();
   private isPanning = false;
@@ -310,10 +323,10 @@ export class InfiniteCanvas implements OnInit, OnDestroy {
         
         // Check if within buffered viewport bounds
         const inBufferedViewport = 
-          screenX + this.CARD_WIDTH >= -bufferedWidth / 2 &&
-          screenX <= viewportWidth + bufferedWidth / 2 &&
-          screenY + this.CARD_HEIGHT >= -bufferedHeight / 2 &&
-          screenY <= viewportHeight + bufferedHeight / 2;
+          screenX + this.CARD_WIDTH >= offsetX - bufferedWidth / 2 &&
+          screenX <= offsetX + viewportWidth + bufferedWidth / 2 &&
+          screenY + this.CARD_HEIGHT >= offsetY - bufferedHeight / 2 &&
+          screenY <= offsetY + viewportHeight + bufferedHeight / 2;
         
         if (inBufferedViewport) {
           // Create stable key based on grid position and pokemon ID
@@ -337,9 +350,9 @@ export class InfiniteCanvas implements OnInit, OnDestroy {
     
     // Pre-fetch images in the scroll direction
     if (imagesToPrefetch.length > 0) {
-      // Prioritize images in scroll direction
-      this.imagePrefetch.prefetchImages(imagesToPrefetch.slice(0, 20))
-        .catch(err => console.warn('Image pre-fetch failed:', err));
+      // Prioritize images in scroll direction (limit batch size)
+      this.imagePrefetch.prefetchImages(imagesToPrefetch.slice(0, this.PREFETCH_BATCH_SIZE))
+        .catch(err => console.warn('Image pre-fetch error:', err));
     }
     
     return visibleCards;
@@ -363,10 +376,6 @@ export class InfiniteCanvas implements OnInit, OnDestroy {
 
   getTransform(card: PokemonCardData): string {
     return `translate3d(${card.screenX}px, ${card.screenY}px, 0)`;
-  }
-
-  trackByPokemon(index: number, card: PokemonCardData): string {
-    return card.stableKey;
   }
 
   formatPokemonName(name: string): string {

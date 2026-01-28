@@ -45,9 +45,10 @@ export class ImagePrefetchService {
 
   /**
    * Pre-fetch multiple images in parallel
+   * Uses Promise.allSettled to handle partial failures
    */
-  prefetchImages(urls: string[]): Promise<void[]> {
-    return Promise.all(urls.map(url => this.prefetchImage(url)));
+  prefetchImages(urls: string[]): Promise<PromiseSettledResult<void>[]> {
+    return Promise.allSettled(urls.map(url => this.prefetchImage(url)));
   }
 
   /**
