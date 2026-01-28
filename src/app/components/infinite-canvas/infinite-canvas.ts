@@ -48,6 +48,7 @@ export class InfiniteCanvas implements OnInit, OnDestroy {
   private offsetY = signal(0);
   private allPokemon = signal<Pokemon[]>([]);
   private isLoading = signal(false);
+  private errorMessage = signal<string | null>(null);
   
   // Computed signal for visible Pokemon
   visiblePokemon = computed(() => {
@@ -67,6 +68,7 @@ export class InfiniteCanvas implements OnInit, OnDestroy {
   private readonly CARD_GAP = 32;
   private readonly POKEMON_LIMIT = 20;
   private readonly API_URL = 'https://pokeapi.co/api/v2/pokemon';
+  private readonly GRID_CELL_SIZE = 40;
   
   private destroy$ = new Subject<void>();
   private isPanning = false;
@@ -77,14 +79,10 @@ export class InfiniteCanvas implements OnInit, OnDestroy {
   currentOffsetX = computed(() => this.offsetX());
   currentOffsetY = computed(() => this.offsetY());
   loading = computed(() => this.isLoading());
+  error = computed(() => this.errorMessage());
 
   constructor(private http: HttpClient) {
-    // Effect to log position changes (for debugging)
-    effect(() => {
-      const x = this.offsetX();
-      const y = this.offsetY();
-      console.log('Canvas position:', { x, y });
-    });
+    // Track position changes for reactive updates
   }
 
   ngOnInit(): void {
@@ -119,6 +117,7 @@ export class InfiniteCanvas implements OnInit, OnDestroy {
       },
       error: (error) => {
         console.error('Failed to load Pokemon:', error);
+        this.errorMessage.set('Using demo data - API unavailable');
         this.isLoading.set(false);
         // Fallback to mock data
         this.loadMockPokemon();
@@ -187,6 +186,7 @@ export class InfiniteCanvas implements OnInit, OnDestroy {
   @HostListener('touchstart', ['$event'])
   onTouchStart(event: TouchEvent): void {
     if (event.touches.length === 1) {
+      event.preventDefault();
       this.isPanning = true;
       this.lastTouchX = event.touches[0].clientX;
       this.lastTouchY = event.touches[0].clientY;
@@ -277,8 +277,8 @@ export class InfiniteCanvas implements OnInit, OnDestroy {
     return `translate3d(${card.screenX}px, ${card.screenY}px, 0)`;
   }
 
-  trackByPokemon(index: number, card: PokemonCardData): string {
-    return `${card.pokemon.id}-${card.screenX}-${card.screenY}`;
+  trackByPokemon(index: number, card: PokemonCardData): number {
+    return card.pokemon.id;
   }
 
   formatPokemonName(name: string): string {
@@ -291,6 +291,6 @@ export class InfiniteCanvas implements OnInit, OnDestroy {
   getBackgroundOffset(): string {
     const x = this.offsetX();
     const y = this.offsetY();
-    return `${x % 40}px ${y % 40}px`;
+    return `${x % this.GRID_CELL_SIZE}px ${y % this.GRID_CELL_SIZE}px`;
   }
 }

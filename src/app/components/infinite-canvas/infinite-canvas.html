@@ -1,6 +1,8 @@
-<div class="infinite-canvas-container">
+<div class="infinite-canvas-container" 
+     role="application" 
+     aria-label="Infinite Pokemon Canvas - Use mouse wheel or drag to explore in any direction">
   <!-- Background grid that moves with canvas -->
-  <div class="background-grid" [style.background-position]="getBackgroundOffset()"></div>
+  <div class="background-grid" [style.background-position]="getBackgroundOffset()" aria-hidden="true"></div>
   
   <!-- Loading indicator -->
   <div class="loading-overlay" *ngIf="loading()">
@@ -23,6 +25,12 @@
       <p>Use trackpad scroll or drag to explore</p>
       <p class="hint">The canvas loops infinitely!</p>
     </div>
+    
+    <!-- Error notification -->
+    <div class="error-notification" *ngIf="error()">
+      <span class="error-icon">⚠️</span>
+      <span>{{ error() }}</span>
+    </div>
   </div>
 
   <!-- Canvas viewport -->
@@ -32,6 +40,9 @@
       *ngFor="let card of visiblePokemon(); trackBy: trackByPokemon"
       class="pokemon-card bento-card"
       [style.transform]="getTransform(card)"
+      tabindex="0"
+      role="button"
+      [attr.aria-label]="'Pokemon ' + formatPokemonName(card.pokemon.name) + ', number ' + card.pokemon.id"
     >
       <div class="card-content">
         <div class="card-image">
@@ -42,7 +53,7 @@
           />
         </div>
         <div class="card-info">
-          <div class="pokemon-id">#{{ card.pokemon.id.toString().padStart(3, '0') }}</div>
+          <div class="pokemon-id" aria-hidden="true">#{{ card.pokemon.id.toString().padStart(3, '0') }}</div>
           <h3 class="pokemon-name">{{ formatPokemonName(card.pokemon.name) }}</h3>
         </div>
       </div>
