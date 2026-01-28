@@ -1,5 +1,67 @@
 <div class="pokemon-grid-container">
-  <!-- Filter Toggle Button -->
+  <!-- Status Banner (fixed, outside canvas) -->
+  <div class="status-banner-fixed" *ngIf="error">
+    <div class="banner-content">
+      <span class="banner-icon">⚠️</span>
+      <span class="banner-text">{{ error }}</span>
+    </div>
+  </div>
+
+  <!-- Infinite Workspace Canvas -->
+  <div class="infinite-canvas" 
+       (mousedown)="onMouseDown($event)"
+       (wheel)="onWheel($event)"
+       [style.transform]="getTransform()"
+       [style.cursor]="isPanning ? 'grabbing' : 'grab'">
+    
+    <!-- Render tiled instances for seamless infinite scrolling -->
+    <div class="pokemon-workspace">
+      <!-- Render 9 tiles (3x3 grid) to create seamless infinite appearance -->
+      <ng-container *ngFor="let tileOffset of tileOffsets">
+        <app-pokemon-card 
+          *ngFor="let poke of filteredPokemon; trackBy: trackByPokemon; let i = index"
+          [pokemon]="poke"
+          [index]="getDisplayIndex(i)"
+          [style.left.px]="getPokemonX(i) + tileOffset.x"
+          [style.top.px]="getPokemonY(i) + tileOffset.y"
+          class="positioned-card"
+          (click)="onPokemonClick(poke.id)">
+        </app-pokemon-card>
+      </ng-container>
+    </div>
+  </div>
+
+  <!-- Loading spinner (fixed, outside canvas) -->
+  <div class="loading-overlay" *ngIf="loading && pokemon.length === 0">
+    <div class="loading-spinner">
+      <div class="spinner">
+        <div class="pokeball">
+          <div class="pokeball-button"></div>
+        </div>
+      </div>
+      <p>Loading Pokémon...</p>
+    </div>
+  </div>
+
+  <!-- Empty state (fixed, outside canvas) -->
+  <div class="empty-state-overlay" *ngIf="!loading && pokemon.length === 0">
+    <div class="empty-state">
+      <div class="empty-icon">🔍</div>
+      <h3>No Pokémon found</h3>
+      <p>Unable to load Pokémon data. Please check your connection and try again.</p>
+    </div>
+  </div>
+
+  <!-- No Results from Filter (fixed, outside canvas) -->
+  <div class="empty-state-overlay" *ngIf="!loading && pokemon.length > 0 && filteredPokemon.length === 0">
+    <div class="empty-state">
+      <div class="empty-icon">🔍</div>
+      <h3>No Pokémon match your filters</h3>
+      <p>Try adjusting your search criteria</p>
+    </div>
+  </div>
+
+  <!-- Filter Toggle Button (bottom center) -->
   <button class="filter-toggle-btn" (click)="toggleSidebar()" [class.active]="isSidebarOpen">
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
@@ -7,13 +69,13 @@
     <span class="filter-label">Filter</span>
   </button>
 
-  <!-- Sidebar Overlay -->
+  <!-- Filter Panel Overlay -->
   <div class="sidebar-overlay" 
        *ngIf="isSidebarOpen" 
        (click)="closeSidebar()">
   </div>
 
-  <!-- Filter Sidebar -->
+  <!-- Filter Panel (bottom) -->
   <aside class="filter-sidebar" [class.open]="isSidebarOpen">
     <div class="sidebar-header">
       <h2>🔍 Filter Pokémon</h2>
@@ -25,84 +87,6 @@
       </app-pokemon-filter>
     </div>
   </aside>
-
-  <header class="grid-header">
-    <h1>Pokémon Browser</h1>
-    <p>Discover and explore the world of Pokémon</p>
-    
-    <div class="status-banner" *ngIf="error">
-      <div class="banner-content">
-        <span class="banner-icon">⚠️</span>
-        <span class="banner-text">{{ error }}</span>
-      </div>
-    </div>
-  </header>
-
-  <!-- Results Count -->
-  <div class="results-info" *ngIf="pokemon.length > 0">
-    <span class="results-count">
-      Showing {{ filteredPokemon.length }} of {{ pokemon.length }} Pokémon
-    </span>
-  </div>
-
-  <div class="pokemon-grid" 
-       *ngIf="filteredPokemon.length > 0">
-    <app-pokemon-card 
-      *ngFor="let poke of filteredPokemon; trackBy: trackByPokemon; let i = index"
-      [pokemon]="poke"
-      [index]="getDisplayIndex(i)"
-      [class.instant-show]="isRecentlyLoaded(i)"
-      (click)="onPokemonClick(poke.id)">
-    </app-pokemon-card>
-    
-    <!-- Skeleton Loading Cards สำหรับโหลดข้อมูลเพิ่มเติม -->
-    <div class="skeleton-card" 
-         *ngFor="let item of [1,2,3,4]; let i = index"
-         [style.animation-delay.ms]="i * 150"
-         [ngClass]="{'visible': showSkeletons}"
-         [ngStyle]="{'display': showSkeletons ? 'block' : 'none'}">
-      <div class="skeleton-image"></div>
-      <div class="skeleton-content">
-        <div class="skeleton-title"></div>
-        <div class="skeleton-text"></div>
-        <div class="skeleton-text short"></div>
-      </div>
-    </div>
-  </div>
-
-  <div class="loading-spinner" *ngIf="loading && pokemon.length === 0">
-    <div class="spinner">
-      <div class="pokeball">
-        <div class="pokeball-button"></div>
-      </div>
-    </div>
-    <p>Loading Pokémon...</p>
-  </div>
-
-  <!-- Loading indicator สำหรับโหลดข้อมูลเพิ่มเติม -->
-  <div class="load-more-indicator" *ngIf="isLoadingMore && pokemon.length > 0">
-    <div class="mini-spinner"></div>
-    <p>Loading more Pokémon...</p>
-  </div>
-
-  <!-- Invisible trigger element สำหรับ Intersection Observer -->
-  <div #loadTrigger 
-       class="load-trigger" 
-       *ngIf="pokemon.length > 0 && hasMorePokemon && !isLoadingMore">
-  </div>
-
-  <div class="empty-state" *ngIf="!loading && pokemon.length === 0">
-    <div class="empty-icon">🔍</div>
-    <h3>No Pokémon found</h3>
-    <p>Unable to load Pokémon data. Please check your connection and try again.</p>
-  </div>
-
-  <!-- No Results from Filter -->
-  <div class="empty-state" *ngIf="!loading && pokemon.length > 0 && filteredPokemon.length === 0">
-    <div class="empty-icon">🔍</div>
-    <h3>No Pokémon match your filters</h3>
-    <p>Try adjusting your search criteria</p>
-  </div>
 
   <!-- Detail Modal -->
   <app-pokemon-detail 

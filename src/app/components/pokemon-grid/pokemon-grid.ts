@@ -1,6 +1,5 @@
-import { Component, OnInit, OnDestroy, HostListener, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
+import { Component, OnInit, OnDestroy, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ScrollingModule } from '@angular/cdk/scrolling';
 import { Subject, takeUntil } from 'rxjs';
 import { PokemonService } from '../../services/pokemon.service';
 import { PokemonCard } from '../pokemon-card/pokemon-card';
@@ -11,27 +10,44 @@ import { GENERATION_RANGES } from '../../utils/pokemon-type-utils';
 
 @Component({
   selector: 'app-pokemon-grid',
-  imports: [CommonModule, ScrollingModule, PokemonCard, PokemonFilter, PokemonDetail],
+  imports: [CommonModule, PokemonCard, PokemonFilter, PokemonDetail],
   templateUrl: './pokemon-grid.html',
   styleUrl: './pokemon-grid.scss'
 })
-export class PokemonGrid implements OnInit, OnDestroy, AfterViewInit {
-  @ViewChild('loadTrigger', { static: false }) loadTrigger?: ElementRef;
-  
+export class PokemonGrid implements OnInit, OnDestroy {
   pokemon: Pokemon[] = [];
   filteredPokemon: Pokemon[] = [];
   loading = false;
   error: string | null = null;
-  isLoadingMore = false; // Changed to public
-  showSkeletons = false;
   selectedPokemonId: number | null = null;
   activeFilter: PokemonFilterData = { keyword: '', types: [], generation: 'all' };
   isSidebarOpen = false;
+  
+  // Pan properties with momentum
+  panX = 0;
+  panY = 0;
+  isPanning = false;
+  private lastMouseX = 0;
+  private lastMouseY = 0;
   private destroy$ = new Subject<void>();
-  private preloadThreshold = 800; // Increased preload distance to 800px
-  private isNearBottom = false;
-  private intersectionObserver?: IntersectionObserver;
-  private lastKnownCount = 0; // Track previous pokemon count
+  private loadingTimeoutId?: number;
+  
+  // Momentum scrolling properties
+  private velocityX = 0;
+  private velocityY = 0;
+  private momentumAnimation?: number;
+  private readonly FRICTION = 0.92; // Friction coefficient for momentum
+  private readonly MIN_VELOCITY = 0.1; // Minimum velocity before stopping
+  
+  // Constants for positioning (grid layout)
+  private readonly CARD_SPACING = 350;
+  private readonly COLUMNS = 6;
+  private readonly INITIAL_LOAD_COUNT = 150; // Load fewer initially for faster startup
+  
+  // Tile offsets for seamless infinite scrolling (3x3 grid of tiles)
+  tileOffsets: { x: number, y: number }[] = [];
+  private gridWidth = 0;
+  private gridHeight = 0;
 
   constructor(private pokemonService: PokemonService) {}
 
@@ -41,9 +57,8 @@ export class PokemonGrid implements OnInit, OnDestroy, AfterViewInit {
       .subscribe(pokemon => {
         this.pokemon = pokemon;
         this.applyFilters();
+        this.updateTileOffsets();
         console.log('Pokemon loaded:', pokemon.length, 'items');
-        // Update lastKnownCount after new data arrives
-        this.lastKnownCount = pokemon.length;
       });
 
     this.pokemonService.loading$
@@ -58,81 +73,204 @@ export class PokemonGrid implements OnInit, OnDestroy, AfterViewInit {
         this.error = error;
       });
 
-    // Load initial Pokemon
-    this.pokemonService.loadPokemon().subscribe();
+    // Load Pokemon optimized for infinite scroll
+    this.loadInitialPokemon();
+  }
+  
+  private updateTileOffsets(): void {
+    const totalCards = this.filteredPokemon.length;
+    if (totalCards === 0) {
+      this.tileOffsets = [];
+      return;
+    }
+    
+    const rows = Math.ceil(totalCards / this.COLUMNS);
+    this.gridWidth = this.COLUMNS * this.CARD_SPACING;
+    this.gridHeight = rows * this.CARD_SPACING;
+    
+    // Create 3x3 grid of tiles for seamless infinite scrolling
+    this.tileOffsets = [];
+    for (let x = -1; x <= 1; x++) {
+      for (let y = -1; y <= 1; y++) {
+        this.tileOffsets.push({
+          x: x * this.gridWidth,
+          y: y * this.gridHeight
+        });
+      }
+    }
   }
 
-  ngAfterViewInit(): void {
-    // ตั้งค่า Intersection Observer สำหรับการโหลดข้อมูลแบบ lazy loading
-    if (this.loadTrigger) {
-      this.intersectionObserver = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting && 
-                !this.loading && 
-                !this.isLoadingMore && 
-                this.pokemonService.hasMorePokemon()) {
-              this.loadMorePokemon();
-            }
+  private loadInitialPokemon(): void {
+    // Load initial batch of Pokemon for faster startup
+    // Since we have infinite tiling, we only need enough to fill 1 tile
+    // The 3x3 tiling will repeat this content seamlessly
+    this.pokemonService.loadPokemon(0).subscribe(() => {
+      // Continue loading in background to reach INITIAL_LOAD_COUNT
+      this.loadMoreInBackground();
+    });
+  }
+  
+  private loadMoreInBackground(): void {
+    // Load more Pokemon in background without blocking UI
+    const loadBatch = () => {
+      if (this.pokemonService.hasMorePokemon() && 
+          this.pokemon.length < this.INITIAL_LOAD_COUNT) {
+        this.pokemonService.loadMorePokemon()
+          .pipe(takeUntil(this.destroy$))
+          .subscribe(() => {
+            // Use longer delay to not overwhelm the system
+            this.loadingTimeoutId = window.setTimeout(() => loadBatch(), 200);
           });
-        },
-        {
-          rootMargin: '300px' // โหลดล่วงหน้า 300px
-        }
-      );
-      
-      this.intersectionObserver.observe(this.loadTrigger.nativeElement);
-    }
+      }
+    };
+    
+    // Start background loading after a short delay
+    this.loadingTimeoutId = window.setTimeout(() => loadBatch(), 300);
   }
 
   ngOnDestroy(): void {
+    // Clear any pending timeout to prevent memory leaks
+    if (this.loadingTimeoutId) {
+      clearTimeout(this.loadingTimeoutId);
+    }
+    
+    // Clear momentum animation
+    if (this.momentumAnimation) {
+      cancelAnimationFrame(this.momentumAnimation);
+    }
+    
     this.destroy$.next();
     this.destroy$.complete();
-    
-    // ทำความสะอาด Intersection Observer
-    if (this.intersectionObserver) {
-      this.intersectionObserver.disconnect();
+  }
+
+  // Pan and Mouse Methods
+  onMouseDown(event: MouseEvent): void {
+    if (event.button === 0 && !(event.target as HTMLElement).closest('.positioned-card')) {
+      this.isPanning = true;
+      this.lastMouseX = event.clientX;
+      this.lastMouseY = event.clientY;
+      
+      // Stop any existing momentum
+      this.velocityX = 0;
+      this.velocityY = 0;
+      if (this.momentumAnimation) {
+        cancelAnimationFrame(this.momentumAnimation);
+        this.momentumAnimation = undefined;
+      }
+      
+      event.preventDefault();
     }
   }
 
-  @HostListener('window:scroll', ['$event'])
-  onScroll(event: any): void {
-    const scrollPosition = window.pageYOffset;
-    const documentHeight = document.documentElement.scrollHeight;
-    const windowHeight = window.innerHeight;
-    const distanceFromBottom = documentHeight - (scrollPosition + windowHeight);
-    
-    // แสดง skeleton เมื่อใกล้ threshold (สำหรับ UX ที่ดีขึ้น)
-    this.isNearBottom = distanceFromBottom <= this.preloadThreshold;
-    this.showSkeletons = this.isNearBottom && this.hasMorePokemon && !this.isLoadingMore;
-    
-    // Fallback loading หากไม่มี Intersection Observer
-    if (distanceFromBottom <= 200 && 
-        !this.loading && 
-        !this.isLoadingMore && 
-        this.hasMorePokemon) {
-      this.loadMorePokemon();
+  @HostListener('document:mousemove', ['$event'])
+  onMouseMove(event: MouseEvent): void {
+    if (this.isPanning) {
+      const deltaX = event.clientX - this.lastMouseX;
+      const deltaY = event.clientY - this.lastMouseY;
+      
+      this.panX += deltaX;
+      this.panY += deltaY;
+      
+      // Store velocity for momentum when released (godly.website style)
+      this.velocityX = deltaX * 0.8;
+      this.velocityY = deltaY * 0.8;
+      
+      this.lastMouseX = event.clientX;
+      this.lastMouseY = event.clientY;
+      
+      // Apply wrapping during drag
+      this.wrapCoordinates();
     }
   }
 
-  private loadMorePokemon(): void {
-    this.isLoadingMore = true;
+  @HostListener('document:mouseup')
+  onMouseUp(): void {
+    if (this.isPanning) {
+      this.isPanning = false;
+      
+      // Start momentum animation on release if there's significant velocity
+      if (Math.abs(this.velocityX) > this.MIN_VELOCITY || 
+          Math.abs(this.velocityY) > this.MIN_VELOCITY) {
+        this.startMomentumScroll();
+      }
+    }
+  }
+
+  onWheel(event: WheelEvent): void {
+    event.preventDefault();
     
-    this.pokemonService.loadMorePokemon()
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: () => {
-          this.isLoadingMore = false;
-          // ซ่อน skeleton หลังจากโหลดเสร็จ
-          setTimeout(() => {
-            this.showSkeletons = false;
-          }, 200);
-        },
-        error: () => {
-          this.isLoadingMore = false;
-          this.showSkeletons = false;
-        }
-      });
+    // Add velocity from wheel input (godly.website style smooth scrolling)
+    this.velocityX += event.deltaX * 0.5;
+    this.velocityY += event.deltaY * 0.5;
+    
+    // Start momentum animation if not already running
+    if (!this.momentumAnimation) {
+      this.startMomentumScroll();
+    }
+  }
+  
+  private startMomentumScroll(): void {
+    const animate = () => {
+      // Apply velocity to position
+      this.panX -= this.velocityX;
+      this.panY -= this.velocityY;
+      
+      // Apply friction (godly.website uses similar momentum decay)
+      this.velocityX *= this.FRICTION;
+      this.velocityY *= this.FRICTION;
+      
+      // Seamless wrapping when crossing tile boundaries
+      this.wrapCoordinates();
+      
+      // Continue animation if velocity is significant
+      if (Math.abs(this.velocityX) > this.MIN_VELOCITY || 
+          Math.abs(this.velocityY) > this.MIN_VELOCITY) {
+        this.momentumAnimation = requestAnimationFrame(animate);
+      } else {
+        // Stop animation when velocity is too low
+        this.velocityX = 0;
+        this.velocityY = 0;
+        this.momentumAnimation = undefined;
+      }
+    };
+    
+    this.momentumAnimation = requestAnimationFrame(animate);
+  }
+  
+  private wrapCoordinates(): void {
+    if (this.gridWidth > 0) {
+      // Modulo wrapping for truly infinite coordinates
+      while (this.panX > this.gridWidth) {
+        this.panX -= this.gridWidth;
+      }
+      while (this.panX < 0) {
+        this.panX += this.gridWidth;
+      }
+    }
+    
+    if (this.gridHeight > 0) {
+      while (this.panY > this.gridHeight) {
+        this.panY -= this.gridHeight;
+      }
+      while (this.panY < 0) {
+        this.panY += this.gridHeight;
+      }
+    }
+  }
+
+  getTransform(): string {
+    return `translate(${this.panX}px, ${this.panY}px)`;
+  }
+
+  // Position Pokemon at specific coordinates in a grid
+  getPokemonX(index: number): number {
+    const col = index % this.COLUMNS;
+    return col * this.CARD_SPACING + 50;
+  }
+
+  getPokemonY(index: number): number {
+    const row = Math.floor(index / this.COLUMNS);
+    return row * this.CARD_SPACING + 50;
   }
 
   trackByPokemon(index: number, pokemon: Pokemon): number {
@@ -140,22 +278,8 @@ export class PokemonGrid implements OnInit, OnDestroy, AfterViewInit {
   }
 
   getDisplayIndex(index: number): number {
-    // Reset animation index every 12 items สำหรับ staggered animation
+    // Reset animation index every 12 items for staggered animation
     return index % 12;
-  }
-
-  isRecentlyLoaded(index: number): boolean {
-    // Cards ที่โหลดใหม่จะแสดงเร็วขึ้น โดยเปรียบเทียบกับ lastKnownCount
-    const initialLoadCount = 24; // จำนวน cards ที่โหลดครั้งแรก
-    return index >= Math.max(initialLoadCount, this.lastKnownCount - 24);
-  }
-
-  get isUsingMockData(): boolean {
-    return this.pokemonService.isUsingMockData();
-  }
-
-  get hasMorePokemon(): boolean {
-    return this.pokemonService.hasMorePokemon();
   }
 
   onFilterChange(filter: PokemonFilterData): void {
@@ -202,6 +326,7 @@ export class PokemonGrid implements OnInit, OnDestroy, AfterViewInit {
     }
 
     this.filteredPokemon = result;
+    this.updateTileOffsets();
   }
 
   onPokemonClick(pokemonId: number): void {
