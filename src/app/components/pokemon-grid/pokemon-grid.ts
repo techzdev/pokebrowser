@@ -4,11 +4,14 @@ import { ScrollingModule } from '@angular/cdk/scrolling';
 import { Subject, takeUntil } from 'rxjs';
 import { PokemonService } from '../../services/pokemon.service';
 import { PokemonCard } from '../pokemon-card/pokemon-card';
-import { Pokemon } from '../../models/pokemon.model';
+import { PokemonFilter } from '../pokemon-filter/pokemon-filter';
+import { PokemonDetail } from '../pokemon-detail/pokemon-detail';
+import { Pokemon, PokemonFilterData } from '../../models/pokemon.model';
+import { GENERATION_RANGES } from '../../utils/pokemon-type-utils';
 
 @Component({
   selector: 'app-pokemon-grid',
-  imports: [CommonModule, ScrollingModule, PokemonCard],
+  imports: [CommonModule, ScrollingModule, PokemonCard, PokemonFilter, PokemonDetail],
   templateUrl: './pokemon-grid.html',
   styleUrl: './pokemon-grid.scss'
 })
@@ -16,15 +19,19 @@ export class PokemonGrid implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('loadTrigger', { static: false }) loadTrigger?: ElementRef;
   
   pokemon: Pokemon[] = [];
+  filteredPokemon: Pokemon[] = [];
   loading = false;
   error: string | null = null;
-  isLoadingMore = false; // เปลี่ยนเป็น public
+  isLoadingMore = false; // Changed to public
   showSkeletons = false;
+  selectedPokemonId: number | null = null;
+  activeFilter: PokemonFilterData = { keyword: '', types: [], generation: 'all' };
+  isSidebarOpen = false;
   private destroy$ = new Subject<void>();
-  private preloadThreshold = 800; // เพิ่มระยะโหลดล่วงหน้าเป็น 800px
+  private preloadThreshold = 800; // Increased preload distance to 800px
   private isNearBottom = false;
   private intersectionObserver?: IntersectionObserver;
-  private lastKnownCount = 0; // ติดตามจำนวน pokemon ก่อนหน้า
+  private lastKnownCount = 0; // Track previous pokemon count
 
   constructor(private pokemonService: PokemonService) {}
 
@@ -33,8 +40,9 @@ export class PokemonGrid implements OnInit, OnDestroy, AfterViewInit {
       .pipe(takeUntil(this.destroy$))
       .subscribe(pokemon => {
         this.pokemon = pokemon;
+        this.applyFilters();
         console.log('Pokemon loaded:', pokemon.length, 'items');
-        // อัปเดต lastKnownCount หลังจากมีข้อมูลใหม่
+        // Update lastKnownCount after new data arrives
         this.lastKnownCount = pokemon.length;
       });
 
@@ -148,5 +156,67 @@ export class PokemonGrid implements OnInit, OnDestroy, AfterViewInit {
 
   get hasMorePokemon(): boolean {
     return this.pokemonService.hasMorePokemon();
+  }
+
+  onFilterChange(filter: PokemonFilterData): void {
+    this.activeFilter = filter;
+    
+    // If generation filter is changed and not 'all', preload that generation's Pokemon
+    if (filter.generation !== 'all') {
+      const [minId, maxId] = GENERATION_RANGES[filter.generation];
+      
+      // Load Pokemon for this generation if not already loaded
+      this.pokemonService.loadPokemonForGeneration(minId, maxId)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe(() => {
+          this.applyFilters();
+        });
+    } else {
+      this.applyFilters();
+    }
+  }
+
+  applyFilters(): void {
+    let result = [...this.pokemon];
+
+    // Filter by keyword (name or id)
+    if (this.activeFilter.keyword) {
+      const keyword = this.activeFilter.keyword.toLowerCase();
+      result = result.filter(p => 
+        p.name.toLowerCase().includes(keyword) || 
+        p.id.toString().includes(keyword)
+      );
+    }
+
+    // Filter by types
+    if (this.activeFilter.types.length > 0) {
+      result = result.filter(p => 
+        p.types?.some(t => this.activeFilter.types.includes(t.type.name))
+      );
+    }
+
+    // Filter by generation (based on pokemon ID ranges)
+    if (this.activeFilter.generation !== 'all') {
+      const [min, max] = GENERATION_RANGES[this.activeFilter.generation] || [1, 1008];
+      result = result.filter(p => p.id >= min && p.id <= max);
+    }
+
+    this.filteredPokemon = result;
+  }
+
+  onPokemonClick(pokemonId: number): void {
+    this.selectedPokemonId = pokemonId;
+  }
+
+  onCloseDetail(): void {
+    this.selectedPokemonId = null;
+  }
+
+  toggleSidebar(): void {
+    this.isSidebarOpen = !this.isSidebarOpen;
+  }
+
+  closeSidebar(): void {
+    this.isSidebarOpen = false;
   }
 }
